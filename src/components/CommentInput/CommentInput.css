@@ -1,0 +1,108 @@
+.comment-input-container {
+  position: fixed;
+  z-index: 1000;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 12px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+  min-width: 320px;
+  max-width: 400px;
+}
+
+.comment-textarea {
+  width: 100%;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 8px 10px;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: inherit;
+  resize: vertical;
+  min-height: 60px;
+}
+
+.comment-textarea:focus {
+  outline: none;
+  border-color: var(--accent-color, #58a6ff);
+}
+
+.comment-textarea::placeholder {
+  color: var(--text-muted);
+}
+
+.comment-input-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 10px;
+  gap: 8px;
+}
+
+.comment-input-left,
+.comment-input-right {
+  display: flex;
+  gap: 8px;
+}
+
+.comment-btn {
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.comment-btn.cancel {
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+}
+
+.comment-btn.cancel:hover {
+  background: var(--bg-active);
+  color: var(--text-primary);
+}
+
+.comment-btn.save {
+  background: var(--accent-color, #58a6ff);
+  color: #fff;
+}
+
+.comment-btn.save:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+
+.comment-btn.save:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.comment-btn.delete {
+  background: rgba(248, 81, 73, 0.2);
+  color: #f85149;
+}
+
+.comment-btn.delete:hover {
+  background: rgba(248, 81, 73, 0.3);
+}
+
+.comment-input-hint {
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.comment-input-hint kbd {
+  display: inline-block;
+  padding: 2px 5px;
+  font-size: 10px;
+  font-family: var(--font-mono);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 3px;
+  margin: 0 2px;
+}

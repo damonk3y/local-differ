@@ -8,6 +8,9 @@ interface HeaderProps {
   onRefresh: () => void
   onSelectRepo: () => void
   loading: boolean
+  commentCount?: number
+  onExportContext?: () => void
+  onClearComments?: () => void
 }
 
 export function Header({
@@ -16,7 +19,10 @@ export function Header({
   onViewModeChange,
   onRefresh,
   onSelectRepo,
-  loading
+  loading,
+  commentCount = 0,
+  onExportContext,
+  onClearComments
 }: HeaderProps) {
   return (
     <header className="header">
@@ -53,6 +59,36 @@ export function Header({
             Unified
           </button>
         </div>
+
+        {onExportContext && (
+          <div className="comment-actions">
+            <button
+              className="export-btn"
+              onClick={onExportContext}
+              disabled={!repoPath}
+              title="Export context for Claude"
+            >
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                <path d="M1 2.75A.75.75 0 011.75 2h12.5a.75.75 0 01.75.75v8.5a.75.75 0 01-.75.75h-3.89l-3.38 2.89a.75.75 0 01-1.22-.58V12H1.75a.75.75 0 01-.75-.75v-8.5z" />
+              </svg>
+              Export
+              {commentCount > 0 && (
+                <span className="comment-count">{commentCount}</span>
+              )}
+            </button>
+            {commentCount > 0 && onClearComments && (
+              <button
+                className="clear-btn"
+                onClick={onClearComments}
+                title="Clear all comments"
+              >
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                  <path d="M3.72 3.72a.75.75 0 011.06 0L8 6.94l3.22-3.22a.75.75 0 111.06 1.06L9.06 8l3.22 3.22a.75.75 0 11-1.06 1.06L8 9.06l-3.22 3.22a.75.75 0 01-1.06-1.06L6.94 8 3.72 4.78a.75.75 0 010-1.06z" />
+                </svg>
+              </button>
+            )}
+          </div>
+        )}
 
         <button
           className="icon-btn"

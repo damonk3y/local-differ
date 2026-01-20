@@ -1,9 +1,42 @@
 import { ipcMain, dialog } from 'electron'
 import { GitService } from './gitService'
+import { SettingsService } from './settingsService'
 
 let gitService: GitService | null = null
+let settingsService: SettingsService | null = null
 
 export function registerGitHandlers() {
+  settingsService = new SettingsService()
+
+  // Settings handlers
+  ipcMain.handle('settings:get-project-path', () => {
+    return settingsService?.getProjectPath() || null
+  })
+
+  ipcMain.handle('settings:set-project-path', (_, path: string | null) => {
+    settingsService?.setProjectPath(path)
+    return { success: true }
+  })
+
+  ipcMain.handle('settings:get-all', () => {
+    return settingsService?.getAll() || { projectPath: null }
+  })
+
+  // Set repo directly from a path (used for loading saved path)
+  ipcMain.handle('git:set-repo', async (_, repoPath: string) => {
+    gitService = new GitService(repoPath)
+
+    const isRepo = await gitService.isGitRepo()
+    if (!isRepo) {
+      gitService = null
+      return { success: false, error: 'Directory is not a git repository' }
+    }
+
+    // Save the path to settings
+    settingsService?.setProjectPath(repoPath)
+    return { success: true, path: repoPath }
+  })
+
   ipcMain.handle('git:select-repo', async () => {
     const result = await dialog.showOpenDialog({
       properties: ['openDirectory'],
@@ -20,6 +53,8 @@ export function registerGitHandlers() {
         return { success: false, error: 'Selected directory is not a git repository' }
       }
 
+      // Save the path to settings
+      settingsService?.setProjectPath(repoPath)
       return { success: true, path: repoPath }
     }
     return { success: false, error: 'No directory selected' }

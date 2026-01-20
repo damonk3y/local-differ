@@ -93,11 +93,23 @@
 }
 
 .file-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-size: 13px;
   color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.file-item.approved .file-name {
+  color: #3fb950;
+}
+
+.approved-icon {
+  flex-shrink: 0;
+  color: #3fb950;
 }
 
 .file-path {

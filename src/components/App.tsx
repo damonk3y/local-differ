@@ -1,17 +1,43 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Header } from './Header/Header'
 import { FileList } from './FileList/FileList'
 import { DiffViewer } from './DiffViewer/DiffViewer'
+import { ContextModal } from './ContextModal/ContextModal'
 import { useGitDiff } from '../hooks/useGitDiff'
+import { useComments } from '../hooks/useComments'
+import { useFileApproval } from '../hooks/useFileApproval'
+import { generateContextMarkdown } from '../services/contextGenerator'
 import { ViewMode, ChangedFile, FileChange } from '../types/diff'
 import './App.css'
 
 export function App() {
-  const { repoPath, files, loading, error, selectRepo, refreshFiles, getFileChange } = useGitDiff()
+  const { repoPath, files, loading, error, initialized, selectRepo, refreshFiles, getFileChange } = useGitDiff()
+  const {
+    getFileComments,
+    addLineComment,
+    updateLineComment,
+    removeLineComment,
+    setFileComment,
+    getAllComments,
+    getTotalCommentCount,
+    clearAllComments
+  } = useComments()
+
+  const {
+    isApproved,
+    toggleApproval,
+    checkAndUpdateApproval,
+    getApprovedFiles
+  } = useFileApproval()
+
   const [viewMode, setViewMode] = useState<ViewMode>('split')
   const [selectedFile, setSelectedFile] = useState<ChangedFile | null>(null)
   const [fileChange, setFileChange] = useState<FileChange | null>(null)
   const [loadingDiff, setLoadingDiff] = useState(false)
+  const [showContextModal, setShowContextModal] = useState(false)
+
+  // Store file data for context generation
+  const fileDataMapRef = useRef<Map<string, { oldContent: string; newContent: string }>>(new Map())
 
   const handleSelectFile = useCallback(async (file: ChangedFile) => {
     setSelectedFile(file)
@@ -19,7 +45,19 @@ export function App() {
     const change = await getFileChange(file)
     setFileChange(change)
     setLoadingDiff(false)
-  }, [getFileChange])
+
+    // Store file data for context generation
+    if (change) {
+      const key = `${file.path}:${file.staged}`
+      fileDataMapRef.current.set(key, {
+        oldContent: change.oldContent,
+        newContent: change.newContent
+      })
+
+      // Check if file was approved but content changed
+      checkAndUpdateApproval(file.path, file.staged, change.oldContent, change.newContent)
+    }
+  }, [getFileChange, checkAndUpdateApproval])
 
   // Auto-select first file when files change
   useEffect(() => {
@@ -28,9 +66,73 @@ export function App() {
     }
   }, [files, selectedFile, handleSelectFile])
 
+  // Track previous files to detect refresh
+  const prevFilesRef = useRef<ChangedFile[]>([])
+
+  // Check approved files and refresh selected file when files list changes (e.g., after refresh)
+  useEffect(() => {
+    const handleFilesChange = async () => {
+      // Check if this is a refresh (files existed before)
+      const isRefresh = prevFilesRef.current.length > 0
+
+      // Check approved files for changes
+      const approvedFiles = getApprovedFiles()
+      for (const { filePath, staged } of approvedFiles) {
+        const file = files.find(f => f.path === filePath && f.staged === staged)
+        if (file) {
+          const change = await getFileChange(file)
+          if (change) {
+            checkAndUpdateApproval(filePath, staged, change.oldContent, change.newContent)
+          }
+        }
+      }
+
+      // If we have a selected file, refresh its content
+      if (selectedFile && isRefresh) {
+        const stillExists = files.find(
+          f => f.path === selectedFile.path && f.staged === selectedFile.staged
+        )
+        if (stillExists) {
+          // Re-fetch the diff content
+          const change = await getFileChange(stillExists)
+          setFileChange(change)
+
+          // Update file data map
+          if (change) {
+            const key = `${stillExists.path}:${stillExists.staged}`
+            fileDataMapRef.current.set(key, {
+              oldContent: change.oldContent,
+              newContent: change.newContent
+            })
+          }
+        } else {
+          // File no longer exists, clear selection
+          setSelectedFile(null)
+          setFileChange(null)
+        }
+      }
+
+      prevFilesRef.current = files
+    }
+
+    if (files.length > 0) {
+      handleFilesChange()
+    } else if (prevFilesRef.current.length > 0) {
+      // Files were cleared (e.g., all changes committed)
+      setSelectedFile(null)
+      setFileChange(null)
+      prevFilesRef.current = []
+    }
+  }, [files, getApprovedFiles, getFileChange, checkAndUpdateApproval, selectedFile])
+
   // Handle keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't handle shortcuts when typing in inputs
+      if (e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLInputElement) {
+        return
+      }
+
       // Tab to toggle view mode
       if (e.key === 'Tab' && !e.ctrlKey && !e.metaKey) {
         e.preventDefault()
@@ -60,6 +162,65 @@ export function App() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [selectedFile, files, handleSelectFile, refreshFiles, repoPath])
 
+  // Comment handlers for current file
+  const handleAddLineComment = useCallback((
+    lineNumber: number,
+    side: 'old' | 'new',
+    lineContent: string,
+    text: string
+  ) => {
+    if (selectedFile) {
+      addLineComment(selectedFile.path, selectedFile.staged, lineNumber, side, lineContent, text)
+    }
+  }, [selectedFile, addLineComment])
+
+  const handleUpdateLineComment = useCallback((commentId: string, newText: string) => {
+    if (selectedFile) {
+      updateLineComment(selectedFile.path, selectedFile.staged, commentId, newText)
+    }
+  }, [selectedFile, updateLineComment])
+
+  const handleRemoveLineComment = useCallback((commentId: string) => {
+    if (selectedFile) {
+      removeLineComment(selectedFile.path, selectedFile.staged, commentId)
+    }
+  }, [selectedFile, removeLineComment])
+
+  const handleFileCommentChange = useCallback((text: string) => {
+    if (selectedFile) {
+      setFileComment(selectedFile.path, selectedFile.staged, text)
+    }
+  }, [selectedFile, setFileComment])
+
+  // Approval handler
+  const handleToggleApproval = useCallback(() => {
+    if (selectedFile && fileChange) {
+      toggleApproval(selectedFile.path, selectedFile.staged, fileChange.oldContent, fileChange.newContent)
+    }
+  }, [selectedFile, fileChange, toggleApproval])
+
+  // Context modal
+  const handleExportContext = useCallback(() => {
+    setShowContextModal(true)
+  }, [])
+
+  const handleCloseContextModal = useCallback(() => {
+    setShowContextModal(false)
+  }, [])
+
+  // Get current file's comments
+  const currentFileComment = selectedFile
+    ? getFileComments(selectedFile.path, selectedFile.staged)
+    : undefined
+
+  // Get current file's approval status
+  const currentFileApproved = selectedFile
+    ? isApproved(selectedFile.path, selectedFile.staged)
+    : false
+
+  // Generate markdown for context modal
+  const contextMarkdown = generateContextMarkdown(getAllComments(), fileDataMapRef.current)
+
   return (
     <div className="app">
       <Header
@@ -69,10 +230,19 @@ export function App() {
         onRefresh={refreshFiles}
         onSelectRepo={selectRepo}
         loading={loading}
+        commentCount={getTotalCommentCount()}
+        onExportContext={handleExportContext}
+        onClearComments={clearAllComments}
       />
 
       <div className="main-content">
-        {!repoPath ? (
+        {!initialized ? (
+          <div className="welcome-screen">
+            <div className="welcome-content">
+              <p>Loading...</p>
+            </div>
+          </div>
+        ) : !repoPath ? (
           <div className="welcome-screen">
             <div className="welcome-content">
               <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -98,6 +268,7 @@ export function App() {
                 files={files}
                 selectedFile={selectedFile}
                 onSelectFile={handleSelectFile}
+                isFileApproved={isApproved}
               />
             </aside>
             <main className="content">
@@ -114,12 +285,27 @@ export function App() {
                   language={fileChange?.language || 'text'}
                   viewMode={viewMode}
                   loading={loadingDiff}
+                  fileComment={currentFileComment}
+                  onAddLineComment={handleAddLineComment}
+                  onUpdateLineComment={handleUpdateLineComment}
+                  onRemoveLineComment={handleRemoveLineComment}
+                  onFileCommentChange={handleFileCommentChange}
+                  isApproved={currentFileApproved}
+                  onToggleApproval={handleToggleApproval}
                 />
               )}
             </main>
           </>
         )}
       </div>
+
+      {showContextModal && (
+        <ContextModal
+          markdown={contextMarkdown}
+          onClose={handleCloseContextModal}
+          onClear={clearAllComments}
+        />
+      )}
     </div>
   )
 }
