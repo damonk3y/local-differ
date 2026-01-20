@@ -20,7 +20,7 @@ function createWindow() {
     mainWindow.loadURL('http://localhost:5173/src/index.html')
     mainWindow.webContents.openDevTools()
   } else {
-    mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
+    mainWindow.loadFile(join(__dirname, '../renderer/src/index.html'))
   }
 }
 
