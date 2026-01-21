@@ -1,9 +1,9 @@
-import { useState, useRef, useCallback, useEffect, useLayoutEffect } from 'react'
+import { useState, useRef, useCallback, useEffect, useLayoutEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import ReactDiffViewer, { DiffMethod } from 'react-diff-viewer-continued'
 import { Highlight, themes } from 'prism-react-renderer'
 import { ViewMode, ChangedFile, FileComment, LineComment } from '../../types/diff'
-import { CommentInput } from '../CommentInput/CommentInput'
+import { CommentSidePanel } from '../CommentSidePanel/CommentSidePanel'
 import { InlineComment } from '../InlineComment/InlineComment'
 import { InlineCommentRow } from '../InlineCommentRow/InlineCommentRow'
 import { CommentBadge } from '../CommentBadge/CommentBadge'
@@ -26,16 +26,15 @@ interface DiffViewerProps {
   onToggleApproval?: () => void
 }
 
-interface CommentInputState {
-  visible: boolean
-  lineNumber: number
+interface CommentPanelState {
+  isOpen: boolean
+  mode: 'add' | 'edit'
+  startLine: number
+  endLine: number
   side: 'old' | 'new'
   lineContent: string
-  position: { x: number; y: number }
+  lineContents: string[]
   existingComment?: LineComment
-  // Multi-line selection data
-  endLine?: number
-  lineContents?: string[]
 }
 
 interface LineSelection {
@@ -157,7 +156,7 @@ export function DiffViewer({
   isApproved = false,
   onToggleApproval
 }: DiffViewerProps) {
-  const [commentInput, setCommentInput] = useState<CommentInputState | null>(null)
+  const [commentPanel, setCommentPanel] = useState<CommentPanelState | null>(null)
   const [showFileComment, setShowFileComment] = useState(false)
   const [inlineCommentContainers, setInlineCommentContainers] = useState<Map<string, HTMLTableRowElement>>(new Map())
   const [lineSelection, setLineSelection] = useState<LineSelection | null>(null)
@@ -175,17 +174,40 @@ export function DiffViewer({
   const { focusedComment } = useCommentNavigation({
     comments: sortedComments,
     onEditComment: (comment) => {
-      setCommentInput({
-        visible: true,
-        lineNumber: comment.startLine,
+      setCommentPanel({
+        isOpen: true,
+        mode: 'edit',
+        startLine: comment.startLine,
+        endLine: comment.endLine,
         side: comment.side,
         lineContent: comment.lineContent,
-        position: { x: window.innerWidth / 2 - 200, y: window.innerHeight / 2 - 100 },
+        lineContents: comment.lineContents || [comment.lineContent],
         existingComment: comment
       })
     },
-    enabled: !commentInput?.visible // Disable when comment input is open
+    enabled: !commentPanel?.isOpen // Disable when comment panel is open
   })
+
+  // Build code context for the comment panel
+  const codeContext = useMemo(() => {
+    if (!commentPanel) return null
+
+    const content = commentPanel.side === 'new' ? newContent : oldContent
+    const lines = content.split('\n')
+    const contextSize = 3
+
+    const start = Math.max(0, commentPanel.startLine - 1 - contextSize)
+    const end = Math.min(lines.length, commentPanel.endLine + contextSize)
+
+    const contextLines: Array<{ lineNum: number; content: string; isTarget: boolean }> = []
+    for (let i = start; i < end; i++) {
+      const lineNum = i + 1
+      const isTarget = lineNum >= commentPanel.startLine && lineNum <= commentPanel.endLine
+      contextLines.push({ lineNum, content: lines[i] || '', isTarget })
+    }
+
+    return { lines: contextLines, language }
+  }, [commentPanel, oldContent, newContent, language])
 
   // Helper to extract line info from a row click/event
   const extractLineInfo = useCallback((target: HTMLElement, preferredSide?: 'old' | 'new'): {
@@ -319,7 +341,7 @@ export function DiffViewer({
     })
   }, [isSelecting, extractLineInfo])
 
-  // Mouse up - finalize selection and open comment input
+  // Mouse up - finalize selection and open comment panel
   const handleMouseUp = useCallback((e: React.MouseEvent) => {
     if (!isSelecting || !lineSelection) {
       setIsSelecting(false)
@@ -328,10 +350,10 @@ export function DiffViewer({
 
     setIsSelecting(false)
 
-    // Check if there's an existing comment for this range
+    // Check if there's an existing comment for this exact range
     const existingComment = fileComment?.lineComments.find(
-      c => c.startLine <= lineSelection.startLine &&
-           c.endLine >= lineSelection.endLine &&
+      c => c.startLine === lineSelection.startLine &&
+           c.endLine === lineSelection.endLine &&
            c.side === lineSelection.side
     )
 
@@ -348,19 +370,14 @@ export function DiffViewer({
       }
     }
 
-    // Calculate position
-    const rect = (e.target as HTMLElement).closest('tr')?.getBoundingClientRect()
-    const x = Math.min(e.clientX, window.innerWidth - 420)
-    const y = Math.min((rect?.bottom || e.clientY) + 8, window.innerHeight - 200)
-
-    setCommentInput({
-      visible: true,
-      lineNumber: lineSelection.startLine,
+    setCommentPanel({
+      isOpen: true,
+      mode: existingComment ? 'edit' : 'add',
+      startLine: lineSelection.startLine,
       endLine: lineSelection.endLine,
       side: lineSelection.side,
       lineContent: lineContents[0] || '',
       lineContents,
-      position: { x, y },
       existingComment
     })
 
@@ -383,58 +400,56 @@ export function DiffViewer({
   const handleBadgeClick = useCallback((comment: LineComment, e: React.MouseEvent) => {
     e.stopPropagation()
 
-    const rect = (e.target as HTMLElement).getBoundingClientRect()
-    const x = Math.min(rect.left, window.innerWidth - 420)
-    const y = Math.min(rect.bottom + 8, window.innerHeight - 200)
-
-    setCommentInput({
-      visible: true,
-      lineNumber: comment.startLine,
+    setCommentPanel({
+      isOpen: true,
+      mode: 'edit',
+      startLine: comment.startLine,
+      endLine: comment.endLine,
       side: comment.side,
       lineContent: comment.lineContent,
-      position: { x, y },
+      lineContents: comment.lineContents || [comment.lineContent],
       existingComment: comment
     })
   }, [])
 
   const handleSaveComment = useCallback((text: string) => {
-    if (!commentInput) return
+    if (!commentPanel) return
 
-    if (commentInput.existingComment) {
-      onUpdateLineComment?.(commentInput.existingComment.id, text)
+    if (commentPanel.existingComment) {
+      onUpdateLineComment?.(commentPanel.existingComment.id, text)
     } else {
-      const endLine = commentInput.endLine ?? commentInput.lineNumber
-      const lineContents = commentInput.lineContents ?? [commentInput.lineContent]
       onAddLineComment?.(
-        commentInput.lineNumber,
-        endLine,
-        commentInput.side,
-        commentInput.lineContent,
-        lineContents,
+        commentPanel.startLine,
+        commentPanel.endLine,
+        commentPanel.side,
+        commentPanel.lineContent,
+        commentPanel.lineContents,
         text
       )
     }
-    setCommentInput(null)
-  }, [commentInput, onAddLineComment, onUpdateLineComment])
+    setCommentPanel(null)
+  }, [commentPanel, onAddLineComment, onUpdateLineComment])
 
   const handleDeleteComment = useCallback(() => {
-    if (commentInput?.existingComment) {
-      onRemoveLineComment?.(commentInput.existingComment.id)
+    if (commentPanel?.existingComment) {
+      onRemoveLineComment?.(commentPanel.existingComment.id)
     }
-    setCommentInput(null)
-  }, [commentInput, onRemoveLineComment])
+    setCommentPanel(null)
+  }, [commentPanel, onRemoveLineComment])
 
-  const handleCancelComment = useCallback(() => {
-    setCommentInput(null)
+  const handleClosePanel = useCallback(() => {
+    setCommentPanel(null)
   }, [])
 
   const handleEditInlineComment = useCallback((comment: LineComment) => {
-    setCommentInput({
-      visible: true,
-      lineNumber: comment.startLine,
+    setCommentPanel({
+      isOpen: true,
+      mode: 'edit',
+      startLine: comment.startLine,
+      endLine: comment.endLine,
       side: comment.side,
       lineContent: comment.lineContent,
-      position: { x: window.innerWidth / 2 - 200, y: window.innerHeight / 2 - 100 },
+      lineContents: comment.lineContents || [comment.lineContent],
       existingComment: comment
     })
   }, [])
@@ -707,16 +722,25 @@ export function DiffViewer({
         </div>
       )}
 
-      {/* Comment input popup */}
-      {commentInput?.visible && (
-        <CommentInput
-          initialText={commentInput.existingComment?.text || ''}
-          position={commentInput.position}
-          onSave={handleSaveComment}
-          onCancel={handleCancelComment}
-          onDelete={commentInput.existingComment ? handleDeleteComment : undefined}
-        />
-      )}
+      {/* Comment side panel */}
+      <CommentSidePanel
+        isOpen={commentPanel?.isOpen || false}
+        mode={commentPanel?.mode || 'add'}
+        filePath={file?.path || ''}
+        codeContext={codeContext}
+        targetLines={{
+          start: commentPanel?.startLine || 1,
+          end: commentPanel?.endLine || 1,
+          side: commentPanel?.side || 'new'
+        }}
+        existingComment={commentPanel?.existingComment}
+        allComments={sortedComments}
+        onSave={handleSaveComment}
+        onDelete={commentPanel?.existingComment ? handleDeleteComment : undefined}
+        onClose={handleClosePanel}
+        onEditComment={handleEditInlineComment}
+        onDeleteComment={(id) => onRemoveLineComment?.(id)}
+      />
 
       {/* Render inline comment rows via portals */}
       {fileComment?.lineComments.map(comment => {

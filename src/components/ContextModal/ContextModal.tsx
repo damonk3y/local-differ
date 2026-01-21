@@ -1,15 +1,23 @@
 import { useState, useEffect, useRef } from 'react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import './ContextModal.css'
 
 interface ContextModalProps {
   markdown: string
   onClose: () => void
   onClear?: () => void
+  reviewFocus?: string
+  onReviewFocusChange?: (value: string) => void
 }
 
-export function ContextModal({ markdown, onClose, onClear }: ContextModalProps) {
+export function ContextModal({ markdown, onClose, onClear, reviewFocus, onReviewFocusChange }: ContextModalProps) {
   const [copied, setCopied] = useState(false)
+  const [viewMode, setViewMode] = useState<'rendered' | 'raw'>('rendered')
   const contentRef = useRef<HTMLDivElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -59,6 +67,20 @@ export function ContextModal({ markdown, onClose, onClear }: ContextModalProps) 
                 Clear All
               </button>
             )}
+            <div className="view-toggle">
+              <button
+                className={`toggle-btn ${viewMode === 'rendered' ? 'active' : ''}`}
+                onClick={() => setViewMode('rendered')}
+              >
+                Preview
+              </button>
+              <button
+                className={`toggle-btn ${viewMode === 'raw' ? 'active' : ''}`}
+                onClick={() => setViewMode('raw')}
+              >
+                Raw
+              </button>
+            </div>
             <button
               className={`copy-btn ${copied ? 'copied' : ''}`}
               onClick={handleCopy}
@@ -87,8 +109,59 @@ export function ContextModal({ markdown, onClose, onClear }: ContextModalProps) 
             </button>
           </div>
         </div>
+        {onReviewFocusChange && (
+          <div className="review-focus-section">
+            <label htmlFor="review-focus">
+              <strong>Review Focus</strong>
+              <span className="review-focus-hint">What would you like Claude to focus on?</span>
+            </label>
+            <textarea
+              ref={textareaRef}
+              id="review-focus"
+              className="review-focus-input"
+              placeholder="e.g., Check for security vulnerabilities, Review error handling, Validate the API design..."
+              value={reviewFocus || ''}
+              onChange={(e) => onReviewFocusChange(e.target.value)}
+              rows={2}
+            />
+          </div>
+        )}
         <div className="context-modal-body" ref={contentRef}>
-          <pre className="markdown-content">{markdown}</pre>
+          {viewMode === 'rendered' ? (
+            <div className="rendered-markdown">
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                components={{
+                  code({ node, className, children, ...props }) {
+                    const match = /language-(\w+)/.exec(className || '')
+                    const inline = !match
+                    return !inline ? (
+                      <SyntaxHighlighter
+                        style={vscDarkPlus}
+                        language={match[1]}
+                        PreTag="div"
+                        customStyle={{
+                          margin: 0,
+                          borderRadius: '6px',
+                          fontSize: '13px'
+                        }}
+                      >
+                        {String(children).replace(/\n$/, '')}
+                      </SyntaxHighlighter>
+                    ) : (
+                      <code className={className} {...props}>
+                        {children}
+                      </code>
+                    )
+                  }
+                }}
+              >
+                {markdown}
+              </ReactMarkdown>
+            </div>
+          ) : (
+            <pre className="raw-markdown">{markdown}</pre>
+          )}
         </div>
       </div>
     </div>

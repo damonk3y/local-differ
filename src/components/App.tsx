@@ -7,7 +7,7 @@ import { useGitDiff } from '../hooks/useGitDiff'
 import { useComments } from '../hooks/useComments'
 import { useFileApproval } from '../hooks/useFileApproval'
 import { generateContextMarkdown } from '../services/contextGenerator'
-import { ViewMode, ChangedFile, FileChange } from '../types/diff'
+import { ViewMode, ChangedFile, FileChange, FileContextData, ContextOptions } from '../types/diff'
 import './App.css'
 
 export function App() {
@@ -37,7 +37,8 @@ export function App() {
   const [showContextModal, setShowContextModal] = useState(false)
 
   // Store file data for context generation
-  const fileDataMapRef = useRef<Map<string, { oldContent: string; newContent: string }>>(new Map())
+  const fileDataMapRef = useRef<Map<string, FileContextData>>(new Map())
+  const [reviewFocus, setReviewFocus] = useState('')
 
   const handleSelectFile = useCallback(async (file: ChangedFile) => {
     setSelectedFile(file)
@@ -51,7 +52,9 @@ export function App() {
       const key = `${file.path}:${file.staged}`
       fileDataMapRef.current.set(key, {
         oldContent: change.oldContent,
-        newContent: change.newContent
+        newContent: change.newContent,
+        language: change.language,
+        status: file.status
       })
 
       // Check if file was approved but content changed
@@ -102,7 +105,9 @@ export function App() {
             const key = `${stillExists.path}:${stillExists.staged}`
             fileDataMapRef.current.set(key, {
               oldContent: change.oldContent,
-              newContent: change.newContent
+              newContent: change.newContent,
+              language: change.language,
+              status: stillExists.status
             })
           }
         } else {
@@ -221,7 +226,10 @@ export function App() {
     : false
 
   // Generate markdown for context modal
-  const contextMarkdown = generateContextMarkdown(getAllComments(), fileDataMapRef.current)
+  const contextOptions: ContextOptions = {
+    reviewFocus: reviewFocus || undefined
+  }
+  const contextMarkdown = generateContextMarkdown(getAllComments(), fileDataMapRef.current, contextOptions)
 
   return (
     <div className="app">
@@ -306,6 +314,8 @@ export function App() {
           markdown={contextMarkdown}
           onClose={handleCloseContextModal}
           onClear={clearAllComments}
+          reviewFocus={reviewFocus}
+          onReviewFocusChange={setReviewFocus}
         />
       )}
     </div>

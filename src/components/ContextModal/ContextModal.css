@@ -43,7 +43,36 @@
 .context-modal-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
+}
+
+.view-toggle {
+  display: flex;
+  background: var(--bg-tertiary);
+  border-radius: 6px;
+  padding: 2px;
+}
+
+.toggle-btn {
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.toggle-btn:hover {
+  color: var(--text-primary);
+}
+
+.toggle-btn.active {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
 .clear-all-btn {
@@ -108,13 +137,58 @@
   color: var(--text-primary);
 }
 
+.review-focus-section {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+}
+
+.review-focus-section label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+}
+
+.review-focus-hint {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-secondary);
+}
+
+.review-focus-input {
+  width: 100%;
+  padding: 10px 12px;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-primary);
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  resize: vertical;
+  min-height: 60px;
+}
+
+.review-focus-input:focus {
+  outline: none;
+  border-color: var(--accent-color, #58a6ff);
+  box-shadow: 0 0 0 2px rgba(88, 166, 255, 0.2);
+}
+
+.review-focus-input::placeholder {
+  color: var(--text-tertiary);
+}
+
 .context-modal-body {
   flex: 1;
   overflow: auto;
   padding: 20px;
 }
 
-.markdown-content {
+.raw-markdown {
   margin: 0;
   font-family: var(--font-mono);
   font-size: 13px;
@@ -122,4 +196,151 @@
   color: var(--text-primary);
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+/* Rendered Markdown Styles */
+.rendered-markdown {
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--text-primary);
+}
+
+.rendered-markdown h1 {
+  font-size: 1.8em;
+  font-weight: 600;
+  margin: 0 0 16px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.rendered-markdown h2 {
+  font-size: 1.4em;
+  font-weight: 600;
+  margin: 24px 0 12px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.rendered-markdown h3 {
+  font-size: 1.15em;
+  font-weight: 600;
+  margin: 20px 0 10px;
+}
+
+.rendered-markdown h4 {
+  font-size: 1em;
+  font-weight: 600;
+  margin: 16px 0 8px;
+}
+
+.rendered-markdown p {
+  margin: 0 0 12px;
+}
+
+.rendered-markdown strong {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.rendered-markdown em {
+  font-style: italic;
+}
+
+.rendered-markdown a {
+  color: var(--accent-color, #58a6ff);
+  text-decoration: none;
+}
+
+.rendered-markdown a:hover {
+  text-decoration: underline;
+}
+
+.rendered-markdown ul,
+.rendered-markdown ol {
+  margin: 0 0 12px;
+  padding-left: 24px;
+}
+
+.rendered-markdown li {
+  margin: 4px 0;
+}
+
+.rendered-markdown li > p {
+  margin: 0;
+}
+
+.rendered-markdown blockquote {
+  margin: 12px 0;
+  padding: 8px 16px;
+  border-left: 4px solid var(--accent-color, #58a6ff);
+  background: var(--bg-secondary);
+  border-radius: 0 6px 6px 0;
+}
+
+.rendered-markdown blockquote p {
+  margin: 0;
+}
+
+.rendered-markdown blockquote code {
+  background: var(--bg-tertiary);
+}
+
+.rendered-markdown code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  padding: 2px 6px;
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+  color: #e06c75;
+}
+
+.rendered-markdown pre {
+  margin: 12px 0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.rendered-markdown pre code {
+  padding: 0;
+  background: transparent;
+  color: inherit;
+}
+
+.rendered-markdown hr {
+  border: none;
+  border-top: 1px solid var(--border-color);
+  margin: 20px 0;
+}
+
+.rendered-markdown table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 12px 0;
+  font-size: 13px;
+}
+
+.rendered-markdown th,
+.rendered-markdown td {
+  padding: 10px 12px;
+  border: 1px solid var(--border-color);
+  text-align: left;
+}
+
+.rendered-markdown th {
+  background: var(--bg-secondary);
+  font-weight: 600;
+}
+
+.rendered-markdown tr:nth-child(even) {
+  background: var(--bg-secondary);
+}
+
+.rendered-markdown img {
+  max-width: 100%;
+  border-radius: 6px;
+}
+
+/* Diff code block special styling */
+.rendered-markdown pre[class*="language-diff"] {
+  background: var(--bg-secondary);
 }

@@ -10,6 +10,20 @@ export interface FileChange {
   language: string
 }
 
+// Enhanced file data for context generation
+export interface FileContextData {
+  oldContent: string
+  newContent: string
+  language: string
+  status: string // A=Added, D=Deleted, M=Modified, R=Renamed
+}
+
+// Context generation options
+export interface ContextOptions {
+  reviewFocus?: string // User's question or focus area
+  includeUncommentedFiles?: boolean // Include files without comments
+}
+
 export type ViewMode = 'split' | 'unified'
 
 export interface LineComment {
