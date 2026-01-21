@@ -120,7 +120,9 @@ export function useGitDiff() {
           oldContent = await invoke<string>('get_file_content', { filePath: file.path, gitRef: 'HEAD' })
           newContent = await invoke<string>('get_file_content', { filePath: file.path, gitRef: 'index' })
         } else {
-          oldContent = await invoke<string>('get_file_content', { filePath: file.path, gitRef: 'index' })
+          // For unstaged changes, compare working directory against HEAD
+          // (index might be empty if nothing was staged)
+          oldContent = await invoke<string>('get_file_content', { filePath: file.path, gitRef: 'HEAD' })
           newContent = await invoke<string>('get_file_content', { filePath: file.path, gitRef: 'working' })
         }
       }

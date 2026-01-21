@@ -14,10 +14,21 @@ export type ViewMode = 'split' | 'unified'
 
 export interface LineComment {
   id: string
-  lineNumber: number
+  startLine: number
+  endLine: number
   lineContent: string
+  lineContents?: string[]
   side: 'old' | 'new'
   text: string
+  createdAt: number
+  updatedAt: number
+}
+
+// Storage format for localStorage persistence
+export interface StoredComments {
+  version: number
+  comments: Record<string, FileComment>
+  lastModified: number
 }
 
 export interface FileComment {

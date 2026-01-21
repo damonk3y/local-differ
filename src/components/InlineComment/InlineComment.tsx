@@ -1,3 +1,5 @@
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { LineComment } from '../../types/diff'
 import './InlineComment.css'
 
@@ -8,11 +10,15 @@ interface InlineCommentProps {
 }
 
 export function InlineComment({ comment, onEdit, onDelete }: InlineCommentProps) {
+  const lineLabel = comment.startLine === comment.endLine
+    ? `Line ${comment.startLine}`
+    : `Lines ${comment.startLine}-${comment.endLine}`
+
   return (
     <div className="inline-comment">
       <div className="inline-comment-header">
         <span className="inline-comment-line">
-          Line {comment.lineNumber}
+          {lineLabel}
           <span className={`inline-comment-side ${comment.side}`}>
             {comment.side === 'new' ? 'added' : 'removed'}
           </span>
@@ -43,7 +49,11 @@ export function InlineComment({ comment, onEdit, onDelete }: InlineCommentProps)
           <code>{comment.lineContent}</code>
         </div>
       )}
-      <div className="inline-comment-text">{comment.text}</div>
+      <div className="inline-comment-text markdown-content">
+        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+          {comment.text}
+        </ReactMarkdown>
+      </div>
     </div>
   )
 }

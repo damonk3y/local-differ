@@ -1,9 +1,13 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect, useLayoutEffect } from 'react'
+import { createPortal } from 'react-dom'
 import ReactDiffViewer, { DiffMethod } from 'react-diff-viewer-continued'
 import { Highlight, themes } from 'prism-react-renderer'
 import { ViewMode, ChangedFile, FileComment, LineComment } from '../../types/diff'
 import { CommentInput } from '../CommentInput/CommentInput'
 import { InlineComment } from '../InlineComment/InlineComment'
+import { InlineCommentRow } from '../InlineCommentRow/InlineCommentRow'
+import { CommentBadge } from '../CommentBadge/CommentBadge'
+import { useCommentNavigation } from '../../hooks/useCommentNavigation'
 import './DiffViewer.css'
 
 interface DiffViewerProps {
@@ -14,7 +18,7 @@ interface DiffViewerProps {
   viewMode: ViewMode
   loading: boolean
   fileComment?: FileComment
-  onAddLineComment?: (lineNumber: number, side: 'old' | 'new', lineContent: string, text: string) => void
+  onAddLineComment?: (startLine: number, endLine: number, side: 'old' | 'new', lineContent: string, lineContents: string[], text: string) => void
   onUpdateLineComment?: (commentId: string, newText: string) => void
   onRemoveLineComment?: (commentId: string) => void
   onFileCommentChange?: (text: string) => void
@@ -29,6 +33,16 @@ interface CommentInputState {
   lineContent: string
   position: { x: number; y: number }
   existingComment?: LineComment
+  // Multi-line selection data
+  endLine?: number
+  lineContents?: string[]
+}
+
+interface LineSelection {
+  startLine: number
+  endLine: number
+  side: 'old' | 'new'
+  lines: Array<{ lineNumber: number; content: string }>
 }
 
 const darkStyles = {
@@ -88,6 +102,46 @@ function mapLanguage(lang: string): string {
   return langMap[lang] || lang
 }
 
+// Helper to find row by line number in the diff table
+function findRowByLineNumber(
+  container: HTMLElement,
+  lineNumber: number,
+  side: 'old' | 'new',
+  viewMode: ViewMode
+): HTMLTableRowElement | null {
+  const rows = container.querySelectorAll('table tbody tr')
+
+  for (const row of rows) {
+    const cells = row.querySelectorAll('td')
+    const gutterCells: { lineNum: number; index: number }[] = []
+
+    cells.forEach((cell, index) => {
+      const text = cell.textContent?.trim() || ''
+      const num = parseInt(text, 10)
+      if (!isNaN(num) && text === String(num)) {
+        gutterCells.push({ lineNum: num, index })
+      }
+    })
+
+    if (viewMode === 'split') {
+      // Split view: first gutter is old, second is new
+      if (side === 'old' && gutterCells[0]?.lineNum === lineNumber) {
+        return row as HTMLTableRowElement
+      }
+      if (side === 'new' && gutterCells[1]?.lineNum === lineNumber) {
+        return row as HTMLTableRowElement
+      }
+    } else {
+      // Unified view
+      if (gutterCells.some(g => g.lineNum === lineNumber)) {
+        return row as HTMLTableRowElement
+      }
+    }
+  }
+
+  return null
+}
+
 export function DiffViewer({
   file,
   oldContent,
@@ -105,34 +159,50 @@ export function DiffViewer({
 }: DiffViewerProps) {
   const [commentInput, setCommentInput] = useState<CommentInputState | null>(null)
   const [showFileComment, setShowFileComment] = useState(false)
+  const [inlineCommentContainers, setInlineCommentContainers] = useState<Map<string, HTMLTableRowElement>>(new Map())
+  const [lineSelection, setLineSelection] = useState<LineSelection | null>(null)
+  const [isSelecting, setIsSelecting] = useState(false)
   const diffContainerRef = useRef<HTMLDivElement>(null)
+  const commentVersionRef = useRef(0)
+  const selectionStartRef = useRef<{ line: number; side: 'old' | 'new'; content: string } | null>(null)
 
-  const handleDiffClick = useCallback((e: React.MouseEvent) => {
-    if (!onAddLineComment) return
+  // Sort comments for navigation
+  const sortedComments = fileComment?.lineComments
+    ? [...fileComment.lineComments].sort((a, b) => a.startLine - b.startLine)
+    : []
 
-    const target = e.target as HTMLElement
+  // Comment navigation with keyboard
+  const { focusedComment } = useCommentNavigation({
+    comments: sortedComments,
+    onEditComment: (comment) => {
+      setCommentInput({
+        visible: true,
+        lineNumber: comment.startLine,
+        side: comment.side,
+        lineContent: comment.lineContent,
+        position: { x: window.innerWidth / 2 - 200, y: window.innerHeight / 2 - 100 },
+        existingComment: comment
+      })
+    },
+    enabled: !commentInput?.visible // Disable when comment input is open
+  })
 
-    // Check if clicking on a comment badge or inside comment input
-    if (target.closest('.comment-badge') || target.closest('.comment-input-container')) {
-      return
-    }
+  // Helper to extract line info from a row click/event
+  const extractLineInfo = useCallback((target: HTMLElement, preferredSide?: 'old' | 'new'): {
+    lineNumber: number | null
+    side: 'old' | 'new'
+    lineContent: string
+    row: HTMLTableRowElement | null
+  } => {
+    const row = target.closest('tr') as HTMLTableRowElement | null
+    if (!row) return { lineNumber: null, side: 'new', lineContent: '', row: null }
 
-    // Find the table row
-    const row = target.closest('tr')
-    if (!row) return
-
-    // Get all cells in the row
     const cells = row.querySelectorAll('td')
-    if (cells.length === 0) return
+    if (cells.length === 0) return { lineNumber: null, side: 'new', lineContent: '', row }
 
     let lineNumber: number | null = null
-    let side: 'old' | 'new' = 'new'
+    let side: 'old' | 'new' = preferredSide || 'new'
     let lineContent = ''
-
-    // react-diff-viewer-continued structure:
-    // Split view has structure like: gutter | content | marker | gutter | content
-    // The gutters have class names containing "gutter"
-    // Let's find gutter cells by looking for cells with line numbers
 
     const gutterCells: { cell: Element; lineNum: number; index: number }[] = []
     const contentCells: { cell: Element; index: number }[] = []
@@ -140,7 +210,6 @@ export function DiffViewer({
     cells.forEach((cell, index) => {
       const text = cell.textContent?.trim() || ''
       const num = parseInt(text, 10)
-      // Check if this cell contains just a number (gutter cell)
       if (!isNaN(num) && text === String(num)) {
         gutterCells.push({ cell, lineNum: num, index })
       } else if (text.length > 0 || cell.querySelector('pre')) {
@@ -148,53 +217,43 @@ export function DiffViewer({
       }
     })
 
-    // Find which cell was clicked
     const clickedCell = target.closest('td')
     const clickedIndex = clickedCell ? Array.from(cells).indexOf(clickedCell) : -1
 
     if (viewMode === 'split') {
-      // In split view, typically first gutter is old, second is new
       if (gutterCells.length >= 2) {
-        // Determine if click was on old side (before second gutter) or new side
         const secondGutterIndex = gutterCells[1]?.index || cells.length
-        if (clickedIndex < secondGutterIndex) {
+        if (preferredSide === 'old' || (!preferredSide && clickedIndex < secondGutterIndex)) {
           side = 'old'
           lineNumber = gutterCells[0]?.lineNum || null
-          // Find content cell after first gutter
           const contentAfterFirst = contentCells.find(c => c.index > gutterCells[0].index && c.index < secondGutterIndex)
           lineContent = contentAfterFirst?.cell.textContent || ''
         } else {
           side = 'new'
           lineNumber = gutterCells[1]?.lineNum || null
-          // Find content cell after second gutter
           const contentAfterSecond = contentCells.find(c => c.index > secondGutterIndex)
           lineContent = contentAfterSecond?.cell.textContent || ''
         }
       } else if (gutterCells.length === 1) {
-        // Only one side has content (added or removed line)
         lineNumber = gutterCells[0].lineNum
-        // Determine side based on row class or position
         const rowClasses = row.className || ''
         if (rowClasses.includes('removed') || clickedIndex <= 1) {
-          side = 'old'
+          side = preferredSide || 'old'
         } else {
-          side = 'new'
+          side = preferredSide || 'new'
         }
         lineContent = contentCells[0]?.cell.textContent || ''
       }
     } else {
-      // Unified view: old-gutter, new-gutter, content
       if (gutterCells.length >= 1) {
-        // In unified, prefer new line number if available
         if (gutterCells.length >= 2) {
-          side = 'new'
-          lineNumber = gutterCells[1].lineNum
+          side = preferredSide || 'new'
+          lineNumber = side === 'new' ? gutterCells[1].lineNum : gutterCells[0].lineNum
         } else {
-          // Check position to determine old/new
           if (gutterCells[0].index === 0) {
-            side = 'old'
+            side = preferredSide || 'old'
           } else {
-            side = 'new'
+            side = preferredSide || 'new'
           }
           lineNumber = gutterCells[0].lineNum
         }
@@ -202,27 +261,124 @@ export function DiffViewer({
       }
     }
 
-    if (lineNumber && !isNaN(lineNumber)) {
-      // Check if there's an existing comment for this line
-      const existingComment = fileComment?.lineComments.find(
-        c => c.lineNumber === lineNumber && c.side === side
-      )
+    return { lineNumber, side, lineContent: lineContent.trim(), row }
+  }, [viewMode])
 
-      // Calculate position for the input popup
-      const rect = row.getBoundingClientRect()
-      const x = Math.min(e.clientX, window.innerWidth - 420)
-      const y = Math.min(rect.bottom + 8, window.innerHeight - 200)
+  // Mouse down - start selection
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    if (!onAddLineComment) return
+    const target = e.target as HTMLElement
 
-      setCommentInput({
-        visible: true,
-        lineNumber,
-        side,
-        lineContent: lineContent.trim(),
-        position: { x, y },
-        existingComment
-      })
+    // Ignore clicks on badges, inputs, and inline comments
+    if (target.closest('.comment-badge') || target.closest('.comment-input-container') || target.closest('.inline-comment-row-container')) {
+      return
     }
-  }, [viewMode, fileComment, onAddLineComment])
+
+    const { lineNumber, side, lineContent } = extractLineInfo(target)
+    if (!lineNumber) return
+
+    // Start selection
+    selectionStartRef.current = { line: lineNumber, side, content: lineContent }
+    setIsSelecting(true)
+    setLineSelection({
+      startLine: lineNumber,
+      endLine: lineNumber,
+      side,
+      lines: [{ lineNumber, content: lineContent }]
+    })
+
+    // Prevent text selection
+    e.preventDefault()
+  }, [onAddLineComment, extractLineInfo])
+
+  // Mouse move - extend selection
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!isSelecting || !selectionStartRef.current) return
+
+    const target = e.target as HTMLElement
+    const { lineNumber, lineContent } = extractLineInfo(target, selectionStartRef.current.side)
+
+    if (!lineNumber) return
+
+    const startLine = selectionStartRef.current.line
+    const side = selectionStartRef.current.side
+    const minLine = Math.min(startLine, lineNumber)
+    const maxLine = Math.max(startLine, lineNumber)
+
+    // Build lines array (we'll fill in content when finalizing)
+    const lines: Array<{ lineNumber: number; content: string }> = []
+    for (let ln = minLine; ln <= maxLine; ln++) {
+      lines.push({ lineNumber: ln, content: '' })
+    }
+
+    setLineSelection({
+      startLine: minLine,
+      endLine: maxLine,
+      side,
+      lines
+    })
+  }, [isSelecting, extractLineInfo])
+
+  // Mouse up - finalize selection and open comment input
+  const handleMouseUp = useCallback((e: React.MouseEvent) => {
+    if (!isSelecting || !lineSelection) {
+      setIsSelecting(false)
+      return
+    }
+
+    setIsSelecting(false)
+
+    // Check if there's an existing comment for this range
+    const existingComment = fileComment?.lineComments.find(
+      c => c.startLine <= lineSelection.startLine &&
+           c.endLine >= lineSelection.endLine &&
+           c.side === lineSelection.side
+    )
+
+    // Collect line contents for the selection
+    const lineContents: string[] = []
+    const container = diffContainerRef.current
+    if (container) {
+      for (let ln = lineSelection.startLine; ln <= lineSelection.endLine; ln++) {
+        const row = findRowByLineNumber(container, ln, lineSelection.side, viewMode)
+        if (row) {
+          const info = extractLineInfo(row.querySelector('td') || row, lineSelection.side)
+          lineContents.push(info.lineContent)
+        }
+      }
+    }
+
+    // Calculate position
+    const rect = (e.target as HTMLElement).closest('tr')?.getBoundingClientRect()
+    const x = Math.min(e.clientX, window.innerWidth - 420)
+    const y = Math.min((rect?.bottom || e.clientY) + 8, window.innerHeight - 200)
+
+    setCommentInput({
+      visible: true,
+      lineNumber: lineSelection.startLine,
+      endLine: lineSelection.endLine,
+      side: lineSelection.side,
+      lineContent: lineContents[0] || '',
+      lineContents,
+      position: { x, y },
+      existingComment
+    })
+
+    // Clear selection
+    setLineSelection(null)
+    selectionStartRef.current = null
+  }, [isSelecting, lineSelection, fileComment, viewMode, extractLineInfo])
+
+  // Handle click on diff (for single line when no drag)
+  const handleDiffClick = useCallback((e: React.MouseEvent) => {
+    // This is now handled by mousedown/mouseup
+    // Only handle badge clicks here
+    const target = e.target as HTMLElement
+    if (target.closest('.comment-badge')) {
+      // Badge clicks are handled by the badge component
+      return
+    }
+  }, [])
 
   const handleBadgeClick = useCallback((comment: LineComment, e: React.MouseEvent) => {
     e.stopPropagation()
@@ -233,7 +389,7 @@ export function DiffViewer({
 
     setCommentInput({
       visible: true,
-      lineNumber: comment.lineNumber,
+      lineNumber: comment.startLine,
       side: comment.side,
       lineContent: comment.lineContent,
       position: { x, y },
@@ -247,10 +403,14 @@ export function DiffViewer({
     if (commentInput.existingComment) {
       onUpdateLineComment?.(commentInput.existingComment.id, text)
     } else {
+      const endLine = commentInput.endLine ?? commentInput.lineNumber
+      const lineContents = commentInput.lineContents ?? [commentInput.lineContent]
       onAddLineComment?.(
         commentInput.lineNumber,
+        endLine,
         commentInput.side,
         commentInput.lineContent,
+        lineContents,
         text
       )
     }
@@ -271,7 +431,7 @@ export function DiffViewer({
   const handleEditInlineComment = useCallback((comment: LineComment) => {
     setCommentInput({
       visible: true,
-      lineNumber: comment.lineNumber,
+      lineNumber: comment.startLine,
       side: comment.side,
       lineContent: comment.lineContent,
       position: { x: window.innerWidth / 2 - 200, y: window.innerHeight / 2 - 100 },
@@ -292,12 +452,13 @@ export function DiffViewer({
               if (!line) {
                 return <span key={i} style={{ display: 'block' }}>{' '}</span>
               }
-              const lineProps = getLineProps({ line, key: i })
+              const { key: lineKey, ...lineProps } = getLineProps({ line })
               return (
-                <span key={i} {...lineProps} style={{ display: 'block' }}>
-                  {line.map((token, key) => (
-                    <span key={key} {...getTokenProps({ token })} />
-                  ))}
+                <span key={lineKey ?? i} {...lineProps} style={{ display: 'block' }}>
+                  {line.map((token, tokenIndex) => {
+                    const { key: tokenKey, ...tokenProps } = getTokenProps({ token })
+                    return <span key={tokenKey ?? tokenIndex} {...tokenProps} />
+                  })}
                   {line.length === 0 && ' '}
                 </span>
               )
@@ -308,10 +469,91 @@ export function DiffViewer({
     )
   }, [language])
 
+  // Highlight selected rows during multi-line selection
+  useEffect(() => {
+    if (!diffContainerRef.current) return
+
+    // Clear previous selection highlights
+    const prevSelected = diffContainerRef.current.querySelectorAll('.selecting, .selection-start, .selection-end')
+    prevSelected.forEach(el => {
+      el.classList.remove('selecting', 'selection-start', 'selection-end')
+    })
+
+    if (!lineSelection || !isSelecting) return
+
+    // Highlight rows in the selection range
+    for (let ln = lineSelection.startLine; ln <= lineSelection.endLine; ln++) {
+      const row = findRowByLineNumber(diffContainerRef.current, ln, lineSelection.side, viewMode)
+      if (row) {
+        row.classList.add('selecting')
+        if (ln === lineSelection.startLine) {
+          row.classList.add('selection-start')
+        }
+        if (ln === lineSelection.endLine) {
+          row.classList.add('selection-end')
+        }
+      }
+    }
+  }, [lineSelection, isSelecting, viewMode])
+
+  // Inject inline comment rows after diff renders
+  useLayoutEffect(() => {
+    if (!diffContainerRef.current || !fileComment?.lineComments.length) {
+      // Clean up any existing injected rows
+      const existingRows = diffContainerRef.current?.querySelectorAll('.inline-comment-row-container')
+      existingRows?.forEach(row => row.remove())
+      setInlineCommentContainers(new Map())
+      return
+    }
+
+    const container = diffContainerRef.current
+    const newContainers = new Map<string, HTMLTableRowElement>()
+
+    // Remove old injected rows
+    const existingRows = container.querySelectorAll('.inline-comment-row-container')
+    existingRows.forEach(row => row.remove())
+
+    // Get colspan based on view mode
+    const colspan = viewMode === 'split' ? 5 : 3
+
+    // Inject a row after each commented line
+    for (const comment of fileComment.lineComments) {
+      const targetRow = findRowByLineNumber(container, comment.endLine, comment.side, viewMode)
+
+      if (targetRow) {
+        // Create a container row for the portal
+        const commentRow = document.createElement('tr')
+        commentRow.className = 'inline-comment-row-container'
+        commentRow.setAttribute('data-comment-id', comment.id)
+
+        const cell = document.createElement('td')
+        cell.colSpan = colspan
+        cell.style.padding = '0'
+        commentRow.appendChild(cell)
+
+        targetRow.after(commentRow)
+        newContainers.set(comment.id, commentRow)
+      }
+    }
+
+    setInlineCommentContainers(newContainers)
+    commentVersionRef.current += 1
+  }, [fileComment?.lineComments, viewMode, oldContent, newContent])
+
+  // Handle inline comment edit
+  const handleInlineCommentEdit = useCallback((commentId: string, newText: string) => {
+    onUpdateLineComment?.(commentId, newText)
+  }, [onUpdateLineComment])
+
+  // Handle inline comment delete
+  const handleInlineCommentDelete = useCallback((commentId: string) => {
+    onRemoveLineComment?.(commentId)
+  }, [onRemoveLineComment])
+
   // Render line number with comment badge if exists
   const renderGutter = useCallback((lineNumber: number, side: 'old' | 'new') => {
     const comment = fileComment?.lineComments.find(
-      c => c.lineNumber === lineNumber && c.side === side
+      c => c.startLine <= lineNumber && c.endLine >= lineNumber && c.side === side
     )
 
     return (
@@ -348,10 +590,6 @@ export function DiffViewer({
       </div>
     )
   }
-
-  const sortedComments = fileComment?.lineComments
-    ? [...fileComment.lineComments].sort((a, b) => a.lineNumber - b.lineNumber)
-    : []
 
   return (
     <div className={`diff-viewer ${isApproved ? 'approved' : ''}`}>
@@ -421,9 +659,18 @@ export function DiffViewer({
       )}
 
       <div
-        className="diff-content"
+        className={`diff-content ${isSelecting ? 'selecting' : ''}`}
         ref={diffContainerRef}
-        onClick={handleDiffClick}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={() => {
+          if (isSelecting) {
+            setIsSelecting(false)
+            setLineSelection(null)
+            selectionStartRef.current = null
+          }
+        }}
       >
         <ReactDiffViewer
           oldValue={oldContent}
@@ -470,6 +717,25 @@ export function DiffViewer({
           onDelete={commentInput.existingComment ? handleDeleteComment : undefined}
         />
       )}
+
+      {/* Render inline comment rows via portals */}
+      {fileComment?.lineComments.map(comment => {
+        const containerRow = inlineCommentContainers.get(comment.id)
+        const cell = containerRow?.querySelector('td')
+        if (!cell) return null
+
+        return createPortal(
+          <InlineCommentRow
+            key={comment.id}
+            comment={comment}
+            colspan={viewMode === 'split' ? 5 : 3}
+            isFocused={focusedComment?.id === comment.id}
+            onEdit={handleInlineCommentEdit}
+            onDelete={handleInlineCommentDelete}
+          />,
+          cell
+        )
+      })}
     </div>
   )
 }

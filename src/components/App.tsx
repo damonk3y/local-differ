@@ -164,13 +164,15 @@ export function App() {
 
   // Comment handlers for current file
   const handleAddLineComment = useCallback((
-    lineNumber: number,
+    startLine: number,
+    endLine: number,
     side: 'old' | 'new',
     lineContent: string,
+    lineContents: string[],
     text: string
   ) => {
     if (selectedFile) {
-      addLineComment(selectedFile.path, selectedFile.staged, lineNumber, side, lineContent, text)
+      addLineComment(selectedFile.path, selectedFile.staged, startLine, endLine, side, lineContent, lineContents, text)
     }
   }, [selectedFile, addLineComment])
 

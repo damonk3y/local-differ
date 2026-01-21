@@ -4,8 +4,8 @@
   justify-content: space-between;
   height: 48px;
   padding: 0 16px;
-  background: var(--bg-secondary);
-  border-bottom: 1px solid var(--border-color);
+  background: #252526;
+  border-bottom: 1px solid #404040;
   -webkit-app-region: drag;
 }
 
@@ -15,18 +15,18 @@
   gap: 12px;
 }
 
-.app-title {
+.header-title {
   font-size: 14px;
   font-weight: 600;
-  color: var(--text-primary);
+  color: #d4d4d4;
   margin: 0;
 }
 
-.repo-path {
+.header-repo {
   font-size: 12px;
-  color: var(--text-secondary);
+  color: #808080;
   padding: 4px 8px;
-  background: var(--bg-tertiary);
+  background: #2d2d2d;
   border-radius: 4px;
   max-width: 300px;
   overflow: hidden;
@@ -41,100 +41,64 @@
   -webkit-app-region: no-drag;
 }
 
-.view-toggle {
+.header-view-toggle {
   display: flex;
-  background: var(--bg-tertiary);
+  background: #2d2d2d;
   border-radius: 6px;
   padding: 2px;
 }
 
-.toggle-btn {
+.header-toggle-btn {
   display: flex;
   align-items: center;
   gap: 6px;
   padding: 6px 12px;
   font-size: 12px;
   font-weight: 500;
-  color: var(--text-secondary);
+  color: #808080;
   background: transparent;
   border: none;
   border-radius: 4px;
   cursor: pointer;
-  transition: all 0.15s;
 }
 
-.toggle-btn:hover {
-  color: var(--text-primary);
+.header-toggle-btn:hover {
+  color: #d4d4d4;
 }
 
-.toggle-btn.active {
-  background: var(--bg-active);
-  color: var(--text-primary);
+.header-toggle-btn[data-active="true"] {
+  background: #37373d;
+  color: #d4d4d4;
 }
 
-.icon-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  background: transparent;
-  border: none;
-  border-radius: 6px;
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: all 0.15s;
-}
-
-.icon-btn:hover:not(:disabled) {
-  background: var(--bg-tertiary);
-  color: var(--text-primary);
-}
-
-.icon-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.icon-btn svg.spinning {
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.export-btn {
+.header-export-btn {
   display: flex;
   align-items: center;
   gap: 6px;
   padding: 6px 12px;
   font-size: 12px;
   font-weight: 500;
-  color: #fff;
-  background: var(--accent-color, #58a6ff);
+  color: white;
+  background: #58a6ff;
   border: none;
   border-radius: 6px;
   cursor: pointer;
-  transition: all 0.15s;
 }
 
-.export-btn:hover:not(:disabled) {
-  filter: brightness(1.1);
+.header-export-btn:hover:not(:disabled) {
+  background: #79b8ff;
 }
 
-.export-btn:disabled {
+.header-export-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-.comment-count {
+.header-export-btn svg {
+  flex-shrink: 0;
+}
+
+.header-badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -143,18 +107,12 @@
   padding: 0 5px;
   font-size: 10px;
   font-weight: 600;
-  color: var(--accent-color, #58a6ff);
-  background: #fff;
+  color: #58a6ff;
+  background: white;
   border-radius: 9px;
 }
 
-.comment-actions {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.clear-btn {
+.header-clear-btn {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -166,9 +124,41 @@
   border-radius: 6px;
   color: #f85149;
   cursor: pointer;
-  transition: all 0.15s;
 }
 
-.clear-btn:hover {
+.header-clear-btn:hover {
   background: rgba(248, 81, 73, 0.3);
+}
+
+.header-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: #808080;
+  cursor: pointer;
+}
+
+.header-icon-btn:hover:not(:disabled) {
+  background: #2d2d2d;
+  color: #d4d4d4;
+}
+
+.header-icon-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.header-icon-btn svg.spinning {
+  animation: header-spin 1s linear infinite;
+}
+
+@keyframes header-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }

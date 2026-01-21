@@ -47,15 +47,22 @@ export function generateContextMarkdown(
       lines.push('### Line Comments')
       lines.push('')
 
-      // Sort comments by line number
+      // Sort comments by start line
       const sortedComments = [...fileComment.lineComments].sort(
-        (a, b) => a.lineNumber - b.lineNumber
+        (a, b) => a.startLine - b.startLine
       )
 
       for (const comment of sortedComments) {
         const changeType = comment.side === 'new' ? 'added' : 'removed'
-        lines.push(`**Line ${comment.lineNumber} (${changeType}):** ${comment.text}`)
-        if (comment.lineContent) {
+        const lineLabel = comment.startLine === comment.endLine
+          ? `Line ${comment.startLine}`
+          : `Lines ${comment.startLine}-${comment.endLine}`
+        lines.push(`**${lineLabel} (${changeType}):** ${comment.text}`)
+        if (comment.lineContents && comment.lineContents.length > 0) {
+          lines.push(`\`\`\``)
+          lines.push(comment.lineContents.join('\n'))
+          lines.push(`\`\`\``)
+        } else if (comment.lineContent) {
           lines.push(`\`\`\``)
           lines.push(comment.lineContent)
           lines.push(`\`\`\``)

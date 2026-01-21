@@ -27,18 +27,20 @@ export function Header({
   return (
     <header className="header">
       <div className="header-left">
-        <h1 className="app-title">Local Differ</h1>
+        <h1 className="header-title">Local Differ</h1>
         {repoPath && (
-          <span className="repo-path" title={repoPath}>
+          <span className="header-repo" title={repoPath}>
             {repoPath.split('/').slice(-2).join('/')}
           </span>
         )}
       </div>
 
       <div className="header-right">
-        <div className="view-toggle">
+        {/* View Mode Toggle */}
+        <div className="header-view-toggle">
           <button
-            className={`toggle-btn ${viewMode === 'split' ? 'active' : ''}`}
+            className="header-toggle-btn"
+            data-active={viewMode === 'split'}
             onClick={() => onViewModeChange('split')}
             title="Split view (side-by-side)"
           >
@@ -49,7 +51,8 @@ export function Header({
             Split
           </button>
           <button
-            className={`toggle-btn ${viewMode === 'unified' ? 'active' : ''}`}
+            className="header-toggle-btn"
+            data-active={viewMode === 'unified'}
             onClick={() => onViewModeChange('unified')}
             title="Unified view"
           >
@@ -60,38 +63,38 @@ export function Header({
           </button>
         </div>
 
-        {onExportContext && (
-          <div className="comment-actions">
-            <button
-              className="export-btn"
-              onClick={onExportContext}
-              disabled={!repoPath}
-              title="Export context for Claude"
-            >
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
-                <path d="M1 2.75A.75.75 0 011.75 2h12.5a.75.75 0 01.75.75v8.5a.75.75 0 01-.75.75h-3.89l-3.38 2.89a.75.75 0 01-1.22-.58V12H1.75a.75.75 0 01-.75-.75v-8.5z" />
-              </svg>
-              Export
-              {commentCount > 0 && (
-                <span className="comment-count">{commentCount}</span>
-              )}
-            </button>
-            {commentCount > 0 && onClearComments && (
-              <button
-                className="clear-btn"
-                onClick={onClearComments}
-                title="Clear all comments"
-              >
-                <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
-                  <path d="M3.72 3.72a.75.75 0 011.06 0L8 6.94l3.22-3.22a.75.75 0 111.06 1.06L9.06 8l3.22 3.22a.75.75 0 11-1.06 1.06L8 9.06l-3.22 3.22a.75.75 0 01-1.06-1.06L6.94 8 3.72 4.78a.75.75 0 010-1.06z" />
-                </svg>
-              </button>
-            )}
-          </div>
+        {/* Export Button */}
+        <button
+          className="header-export-btn"
+          onClick={onExportContext}
+          disabled={!repoPath}
+          title="Export context for Claude"
+        >
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="white">
+            <path d="M1 2.75A.75.75 0 011.75 2h12.5a.75.75 0 01.75.75v8.5a.75.75 0 01-.75.75h-3.89l-3.38 2.89a.75.75 0 01-1.22-.58V12H1.75a.75.75 0 01-.75-.75v-8.5z" />
+          </svg>
+          Export
+          {commentCount > 0 && (
+            <span className="header-badge">{commentCount}</span>
+          )}
+        </button>
+
+        {/* Clear Comments Button */}
+        {commentCount > 0 && onClearComments && (
+          <button
+            className="header-clear-btn"
+            onClick={onClearComments}
+            title="Clear all comments"
+          >
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+              <path d="M3.72 3.72a.75.75 0 011.06 0L8 6.94l3.22-3.22a.75.75 0 111.06 1.06L9.06 8l3.22 3.22a.75.75 0 11-1.06 1.06L8 9.06l-3.22 3.22a.75.75 0 01-1.06-1.06L6.94 8 3.72 4.78a.75.75 0 010-1.06z" />
+            </svg>
+          </button>
         )}
 
+        {/* Refresh Button */}
         <button
-          className="icon-btn"
+          className="header-icon-btn"
           onClick={onRefresh}
           disabled={loading || !repoPath}
           title="Refresh"
@@ -107,7 +110,12 @@ export function Header({
           </svg>
         </button>
 
-        <button className="icon-btn" onClick={onSelectRepo} title="Open repository">
+        {/* Open Repo Button */}
+        <button
+          className="header-icon-btn"
+          onClick={onSelectRepo}
+          title="Open repository"
+        >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
             <path d="M1.75 1A1.75 1.75 0 0 0 0 2.75v10.5C0 14.216.784 15 1.75 15h12.5A1.75 1.75 0 0 0 16 13.25v-8.5A1.75 1.75 0 0 0 14.25 3H7.5a.25.25 0 0 1-.2-.1l-.9-1.2C6.07 1.26 5.55 1 5 1H1.75z" />
           </svg>
