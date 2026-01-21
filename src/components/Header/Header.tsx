@@ -11,6 +11,7 @@ interface HeaderProps {
   commentCount?: number
   onExportContext?: () => void
   onClearComments?: () => void
+  onImportReview?: () => void
 }
 
 export function Header({
@@ -22,7 +23,8 @@ export function Header({
   loading,
   commentCount = 0,
   onExportContext,
-  onClearComments
+  onClearComments,
+  onImportReview
 }: HeaderProps) {
   return (
     <header className="header">
@@ -62,6 +64,20 @@ export function Header({
             Unified
           </button>
         </div>
+
+        {/* Import Review Button */}
+        <button
+          className="header-import-btn"
+          onClick={onImportReview}
+          disabled={!repoPath}
+          title="Import review from .claude/review.json"
+        >
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M2.75 14A1.75 1.75 0 011 12.25v-2.5a.75.75 0 011.5 0v2.5c0 .138.112.25.25.25h10.5a.25.25 0 00.25-.25v-2.5a.75.75 0 011.5 0v2.5A1.75 1.75 0 0113.25 14H2.75z" />
+            <path d="M11.78 4.72a.75.75 0 00-1.06-1.06L8.75 5.63V1.75a.75.75 0 00-1.5 0v3.88L5.28 3.66a.75.75 0 00-1.06 1.06l3.25 3.25a.75.75 0 001.06 0l3.25-3.25z" />
+          </svg>
+          Import CR
+        </button>
 
         {/* Export Button */}
         <button

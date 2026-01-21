@@ -21,6 +21,8 @@
   "license": "ISC",
   "dependencies": {
     "@tauri-apps/api": "^2.0.0",
+    "@tauri-apps/plugin-dialog": "^2.6.0",
+    "@tauri-apps/plugin-fs": "^2.4.5",
     "@types/react-syntax-highlighter": "^15.5.13",
     "parse-git-diff": "^0.0.19",
     "prism-react-renderer": "^2.4.1",

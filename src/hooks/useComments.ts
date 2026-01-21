@@ -8,6 +8,29 @@ function generateId(): string {
   return Math.random().toString(36).substring(2, 9)
 }
 
+// Type for imported review comments (from Claude code review)
+export interface ImportedReview {
+  version: number
+  source?: string
+  comments: Record<string, {
+    filePath: string
+    staged: boolean
+    generalComment?: string
+    lineComments: Array<{
+      id?: string
+      startLine: number
+      endLine: number
+      lineContent?: string
+      lineContents?: string[]
+      side: 'old' | 'new'
+      text: string
+      createdAt?: number
+      updatedAt?: number
+    }>
+  }>
+  lastModified?: number
+}
+
 function getFileKey(filePath: string, staged: boolean): string {
   return `${filePath}:${staged}`
 }
@@ -237,6 +260,74 @@ export function useComments() {
     localStorage.removeItem(STORAGE_KEY)
   }, [])
 
+  const importComments = useCallback((reviewData: ImportedReview, mode: 'merge' | 'replace' = 'merge'): { imported: number; skipped: number } => {
+    const now = Date.now()
+    let imported = 0
+    let skipped = 0
+
+    setComments(prev => {
+      const newMap = mode === 'replace' ? new Map() : new Map(prev)
+
+      for (const [key, fileComment] of Object.entries(reviewData.comments)) {
+        const existing = newMap.get(key)
+
+        // Process line comments, adding IDs and timestamps if missing
+        const processedLineComments: LineComment[] = fileComment.lineComments.map(lc => ({
+          id: lc.id || generateId(),
+          startLine: lc.startLine,
+          endLine: lc.endLine,
+          lineContent: lc.lineContent || '',
+          lineContents: lc.lineContents || (lc.lineContent ? [lc.lineContent] : []),
+          side: lc.side,
+          text: lc.text,
+          createdAt: lc.createdAt || now,
+          updatedAt: lc.updatedAt || now
+        }))
+
+        if (mode === 'merge' && existing) {
+          // Merge: add new comments to existing file comments
+          const existingLines = new Set(existing.lineComments.map(c => `${c.startLine}:${c.side}`))
+          const newLineComments = processedLineComments.filter(c => {
+            const lineKey = `${c.startLine}:${c.side}`
+            if (existingLines.has(lineKey)) {
+              skipped++
+              return false
+            }
+            imported++
+            return true
+          })
+
+          // Count general comment if it's new or different
+          const newGeneralComment = fileComment.generalComment || existing.generalComment
+          if (fileComment.generalComment && fileComment.generalComment !== existing.generalComment) {
+            imported++
+          }
+
+          newMap.set(key, {
+            ...existing,
+            generalComment: newGeneralComment,
+            lineComments: [...existing.lineComments, ...newLineComments]
+          })
+        } else {
+          // Replace or new file
+          imported += processedLineComments.length
+          if (fileComment.generalComment) imported++
+
+          newMap.set(key, {
+            filePath: fileComment.filePath,
+            staged: fileComment.staged,
+            generalComment: fileComment.generalComment || '',
+            lineComments: processedLineComments
+          })
+        }
+      }
+
+      return newMap
+    })
+
+    return { imported, skipped }
+  }, [])
+
   return {
     getFileComments,
     addLineComment,
@@ -245,6 +336,7 @@ export function useComments() {
     setFileComment,
     getAllComments,
     getTotalCommentCount,
-    clearAllComments
+    clearAllComments,
+    importComments
   }
 }

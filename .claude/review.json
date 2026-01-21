@@ -1,0 +1,104 @@
+{
+  "version": 2,
+  "source": "claude-code-review",
+  "comments": {
+    "src/components/App.tsx:False": {
+      "filePath": "src/components/App.tsx",
+      "staged": false,
+      "generalComment": "",
+      "lineComments": [
+        {
+          "id": "nbxhqdq",
+          "startLine": 247,
+          "endLine": 247,
+          "lineContent": "console.log('No comments found in review file')",
+          "lineContents": [
+            "console.log('No comments found in review file')"
+          ],
+          "side": "new",
+          "text": "[SUGGESTION] UX: Silent failure - consider showing user feedback when no comments are found in review file instead of just logging to console.",
+          "createdAt": 1769015994404,
+          "updatedAt": 1769015994404
+        },
+        {
+          "id": "t1p08fx",
+          "startLine": 250,
+          "endLine": 250,
+          "lineContent": "console.error('Failed to load review file:', err)",
+          "lineContents": [
+            "console.error('Failed to load review file:', err)"
+          ],
+          "side": "new",
+          "text": "[WARNING] Error Handling: Failed imports are only logged to console. Consider showing a toast or error message to the user so they know why the import didn't work.",
+          "createdAt": 1769015994404,
+          "updatedAt": 1769015994404
+        },
+        {
+          "id": "lak4a7a",
+          "startLine": 262,
+          "endLine": 262,
+          "lineContent": "console.log(`Imported ${result.imported} comments, skipped ${result.skipped} duplicates`)",
+          "lineContents": [
+            "console.log(`Imported ${result.imported} comments, skipped ${result.skipped} duplicates`)"
+          ],
+          "side": "new",
+          "text": "[SUGGESTION] UX: Success feedback only goes to console. Consider showing a brief success notification to confirm the import worked.",
+          "createdAt": 1769015994404,
+          "updatedAt": 1769015994404
+        }
+      ]
+    },
+    "src/components/ReviewModal/ReviewModal.tsx:False": {
+      "filePath": "src/components/ReviewModal/ReviewModal.tsx",
+      "staged": false,
+      "generalComment": "Well-structured component with good separation of concerns. The selection state management is clean.",
+      "lineComments": [
+        {
+          "id": "hw8l1jw",
+          "startLine": 4,
+          "endLine": 26,
+          "lineContent": "interface LineComment {",
+          "lineContents": [
+            "interface LineComment {"
+          ],
+          "side": "new",
+          "text": "[SUGGESTION] DRY: These interfaces (LineComment, FileComment, ReviewData) duplicate types from useComments.ts. Consider exporting and reusing them to maintain a single source of truth.",
+          "createdAt": 1769015994404,
+          "updatedAt": 1769015994404
+        },
+        {
+          "id": "nmuiil9",
+          "startLine": 279,
+          "endLine": 279,
+          "lineContent": "key={idx}",
+          "lineContents": [
+            "key={idx}"
+          ],
+          "side": "new",
+          "text": "[SUGGESTION] Accessibility: Using array index as React key. Since comments can be reordered or filtered, consider using a more stable key like a combination of startLine and side.",
+          "createdAt": 1769015994404,
+          "updatedAt": 1769015994404
+        }
+      ]
+    },
+    "src/services/ignorePatterns.ts:False": {
+      "filePath": "src/services/ignorePatterns.ts",
+      "staged": false,
+      "generalComment": "Clean implementation with good documentation. The regex escaping fix addresses the earlier security concern.",
+      "lineComments": []
+    },
+    "src/hooks/useGitDiff.ts:False": {
+      "filePath": "src/hooks/useGitDiff.ts",
+      "staged": false,
+      "generalComment": "Good use of refs for caching ignore patterns. Clean integration with the Tauri backend.",
+      "lineComments": []
+    },
+    "src/hooks/useComments.ts:False": {
+      "filePath": "src/hooks/useComments.ts",
+      "staged": false,
+      "generalComment": "The import logic handles edge cases well with proper counting for both merge and replace modes.",
+      "lineComments": []
+    }
+  },
+  "lastModified": 1769015994404
+}

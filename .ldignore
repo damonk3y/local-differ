@@ -1,0 +1,6 @@
+# Local Differ ignore patterns
+# Files and directories matching these patterns will be excluded from change reviews
+
+# Claude Code
+.claude/
+*.skill

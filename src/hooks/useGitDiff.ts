@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { ChangedFile, FileChange } from '../types/diff'
 import { detectLanguage } from '../services/languageDetector'
+import { parseIgnorePatterns, shouldIgnoreFile } from '../services/ignorePatterns'
 import type { RepoResult, ChangedFiles } from '../types/tauri'
 
 export function useGitDiff() {
@@ -11,23 +12,42 @@ export function useGitDiff() {
   const [error, setError] = useState<string | null>(null)
   const [initialized, setInitialized] = useState(false)
   const hasLoadedFiles = useRef(false)
+  const ignorePatternsRef = useRef<string[]>([])
+
+  // Load ignore patterns from .ldignore file via Tauri command
+  const loadIgnorePatterns = useCallback(async () => {
+    try {
+      const content = await invoke<string>('get_ignore_patterns')
+      ignorePatternsRef.current = parseIgnorePatterns(content)
+    } catch {
+      ignorePatternsRef.current = []
+    }
+  }, [])
 
   const refreshFiles = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
+      // Reload ignore patterns in case they changed
+      await loadIgnorePatterns()
+
       const result = await invoke<ChangedFiles>('get_changed_files')
       const allFiles: ChangedFile[] = [
         ...result.staged.map(f => ({ ...f, staged: true })),
         ...result.unstaged.map(f => ({ ...f, staged: false }))
       ]
-      setFiles(allFiles)
+
+      // Filter out ignored files
+      const filteredFiles = allFiles.filter(
+        f => !shouldIgnoreFile(f.path, ignorePatternsRef.current)
+      )
+      setFiles(filteredFiles)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to get changed files')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [loadIgnorePatterns])
 
   // Load saved project path on startup
   useEffect(() => {

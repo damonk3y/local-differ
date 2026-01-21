@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { invoke } from '@tauri-apps/api/core'
 import { Header } from './Header/Header'
 import { FileList } from './FileList/FileList'
 import { DiffViewer } from './DiffViewer/DiffViewer'
 import { ContextModal } from './ContextModal/ContextModal'
+import { ReviewModal, ReviewData } from './ReviewModal/ReviewModal'
 import { useGitDiff } from '../hooks/useGitDiff'
-import { useComments } from '../hooks/useComments'
+import { useComments, ImportedReview } from '../hooks/useComments'
 import { useFileApproval } from '../hooks/useFileApproval'
 import { generateContextMarkdown } from '../services/contextGenerator'
 import { ViewMode, ChangedFile, FileChange, FileContextData, ContextOptions } from '../types/diff'
@@ -20,7 +22,8 @@ export function App() {
     setFileComment,
     getAllComments,
     getTotalCommentCount,
-    clearAllComments
+    clearAllComments,
+    importComments
   } = useComments()
 
   const {
@@ -35,6 +38,15 @@ export function App() {
   const [fileChange, setFileChange] = useState<FileChange | null>(null)
   const [loadingDiff, setLoadingDiff] = useState(false)
   const [showContextModal, setShowContextModal] = useState(false)
+  const [showReviewModal, setShowReviewModal] = useState(false)
+  const [pendingReviewData, setPendingReviewData] = useState<ReviewData | null>(null)
+  const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null)
+
+  // Show notification with auto-dismiss
+  const showNotification = useCallback((message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    setNotification({ message, type })
+    setTimeout(() => setNotification(null), 3000)
+  }, [])
 
   // Store file data for context generation
   const fileDataMapRef = useRef<Map<string, FileContextData>>(new Map())
@@ -215,6 +227,50 @@ export function App() {
     setShowContextModal(false)
   }, [])
 
+  // Import review from .claude/review.json - shows modal for approval
+  const handleImportReview = useCallback(async () => {
+    try {
+      const content = await invoke<string>('get_review_file')
+      const reviewData = JSON.parse(content) as ReviewData
+
+      // Validate basic structure
+      if (!reviewData.comments || typeof reviewData.comments !== 'object') {
+        throw new Error('Invalid review file: missing comments')
+      }
+
+      // Check if there are any comments to import
+      const hasComments = Object.values(reviewData.comments).some(
+        fc => fc.generalComment || fc.lineComments.length > 0
+      )
+      if (!hasComments) {
+        showNotification('No suggestions found in .claude/review.json', 'info')
+        return
+      }
+
+      // Show the review modal for user approval
+      setPendingReviewData(reviewData)
+      setShowReviewModal(true)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to load review file'
+      showNotification(message, 'error')
+    }
+  }, [showNotification])
+
+  const handleCloseReviewModal = useCallback(() => {
+    setShowReviewModal(false)
+    setPendingReviewData(null)
+  }, [])
+
+  const handleConfirmImport = useCallback((selectedReviewData: ReviewData) => {
+    const result = importComments(selectedReviewData as ImportedReview, 'merge')
+    const message = result.skipped > 0
+      ? `Imported ${result.imported} suggestions (${result.skipped} duplicates skipped)`
+      : `Imported ${result.imported} suggestions`
+    showNotification(message, 'success')
+    setShowReviewModal(false)
+    setPendingReviewData(null)
+  }, [importComments, showNotification])
+
   // Get current file's comments
   const currentFileComment = selectedFile
     ? getFileComments(selectedFile.path, selectedFile.staged)
@@ -243,6 +299,7 @@ export function App() {
         commentCount={getTotalCommentCount()}
         onExportContext={handleExportContext}
         onClearComments={clearAllComments}
+        onImportReview={handleImportReview}
       />
 
       <div className="main-content">
@@ -317,6 +374,20 @@ export function App() {
           reviewFocus={reviewFocus}
           onReviewFocusChange={setReviewFocus}
         />
+      )}
+
+      {showReviewModal && pendingReviewData && (
+        <ReviewModal
+          reviewData={pendingReviewData}
+          onClose={handleCloseReviewModal}
+          onImport={handleConfirmImport}
+        />
+      )}
+
+      {notification && (
+        <div className={`notification notification-${notification.type}`}>
+          {notification.message}
+        </div>
       )}
     </div>
   )
