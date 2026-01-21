@@ -1,6 +1,8 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
+import { invoke } from '@tauri-apps/api/core'
 import { ChangedFile, FileChange } from '../types/diff'
 import { detectLanguage } from '../services/languageDetector'
+import type { RepoResult, ChangedFiles } from '../types/tauri'
 
 export function useGitDiff() {
   const [repoPath, setRepoPath] = useState<string | null>(null)
@@ -14,7 +16,7 @@ export function useGitDiff() {
     setLoading(true)
     setError(null)
     try {
-      const result = await window.electron.git.getChangedFiles()
+      const result = await invoke<ChangedFiles>('get_changed_files')
       const allFiles: ChangedFile[] = [
         ...result.staged.map(f => ({ ...f, staged: true })),
         ...result.unstaged.map(f => ({ ...f, staged: false }))
@@ -31,9 +33,9 @@ export function useGitDiff() {
   useEffect(() => {
     const loadSavedPath = async () => {
       try {
-        const savedPath = await window.electron.settings.getProjectPath()
+        const savedPath = await invoke<string | null>('get_project_path')
         if (savedPath) {
-          const result = await window.electron.git.setRepo(savedPath)
+          const result = await invoke<RepoResult>('set_repo', { path: savedPath })
           if (result.success && result.path) {
             setRepoPath(result.path)
           }
@@ -60,7 +62,7 @@ export function useGitDiff() {
     setError(null)
     hasLoadedFiles.current = false
     try {
-      const result = await window.electron.git.setRepo(path)
+      const result = await invoke<RepoResult>('set_repo', { path })
       if (result.success && result.path) {
         setRepoPath(result.path)
         return true
@@ -81,7 +83,7 @@ export function useGitDiff() {
     setError(null)
     hasLoadedFiles.current = false
     try {
-      const result = await window.electron.git.selectRepo()
+      const result = await invoke<RepoResult>('select_repo')
       if (result.success && result.path) {
         setRepoPath(result.path)
         return true
@@ -106,20 +108,20 @@ export function useGitDiff() {
         // Added file
         oldContent = ''
         newContent = file.staged
-          ? await window.electron.git.getFileContent(file.path, 'index')
-          : await window.electron.git.getFileContent(file.path, 'working')
+          ? await invoke<string>('get_file_content', { filePath: file.path, gitRef: 'index' })
+          : await invoke<string>('get_file_content', { filePath: file.path, gitRef: 'working' })
       } else if (file.status === 'D') {
         // Deleted file
-        oldContent = await window.electron.git.getFileContent(file.path, 'HEAD')
+        oldContent = await invoke<string>('get_file_content', { filePath: file.path, gitRef: 'HEAD' })
         newContent = ''
       } else {
         // Modified file
         if (file.staged) {
-          oldContent = await window.electron.git.getFileContent(file.path, 'HEAD')
-          newContent = await window.electron.git.getFileContent(file.path, 'index')
+          oldContent = await invoke<string>('get_file_content', { filePath: file.path, gitRef: 'HEAD' })
+          newContent = await invoke<string>('get_file_content', { filePath: file.path, gitRef: 'index' })
         } else {
-          oldContent = await window.electron.git.getFileContent(file.path, 'index')
-          newContent = await window.electron.git.getFileContent(file.path, 'working')
+          oldContent = await invoke<string>('get_file_content', { filePath: file.path, gitRef: 'index' })
+          newContent = await invoke<string>('get_file_content', { filePath: file.path, gitRef: 'working' })
         }
       }
 
