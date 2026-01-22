@@ -33,7 +33,7 @@ export function App() {
     getApprovedFiles
   } = useFileApproval()
 
-  const [viewMode, setViewMode] = useState<ViewMode>('split')
+  const [viewMode, setViewMode] = useState<ViewMode>('unified')
   const [selectedFile, setSelectedFile] = useState<ChangedFile | null>(null)
   const [fileChange, setFileChange] = useState<FileChange | null>(null)
   const [loadingDiff, setLoadingDiff] = useState(false)
