@@ -82,16 +82,6 @@ export function FileList({ files, selectedFile, onSelectFile, isFileApproved }: 
 
   return (
     <div className="file-list">
-      {stagedFiles.length > 0 && (
-        <div className="file-section">
-          <h3 className="section-header">
-            Staged Changes
-            <span className="count">{stagedFiles.length}</span>
-          </h3>
-          {stagedFiles.map(renderFileItem)}
-        </div>
-      )}
-
       {unstagedFiles.length > 0 && (
         <div className="file-section">
           <h3 className="section-header">
@@ -99,6 +89,16 @@ export function FileList({ files, selectedFile, onSelectFile, isFileApproved }: 
             <span className="count">{unstagedFiles.length}</span>
           </h3>
           {unstagedFiles.map(renderFileItem)}
+        </div>
+      )}
+
+      {stagedFiles.length > 0 && (
+        <div className="file-section">
+          <h3 className="section-header">
+            Staged Changes
+            <span className="count">{stagedFiles.length}</span>
+          </h3>
+          {stagedFiles.map(renderFileItem)}
         </div>
       )}
     </div>

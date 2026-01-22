@@ -359,7 +359,12 @@ export function generateContextMarkdown(
     return '# Code Review Context\n\nNo files to review.'
   }
 
-  const lines: string[] = ['# Code Review Context', '']
+  const lines: string[] = [
+    '# Code Review Context',
+    '',
+    '> **Instructions:** Please review the code changes and comments below. Your goal is to **fix the issues described** in the comments. Enter **plan mode** first to analyze the changes and create an implementation plan before making any modifications.',
+    '',
+  ]
 
   // Summary table
   lines.push('## Summary')

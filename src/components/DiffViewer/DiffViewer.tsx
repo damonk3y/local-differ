@@ -165,6 +165,13 @@ export function DiffViewer({
   const commentVersionRef = useRef(0)
   const selectionStartRef = useRef<{ line: number; side: 'old' | 'new'; content: string } | null>(null)
 
+  // Search state
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchVisible, setSearchVisible] = useState(false)
+  const [matches, setMatches] = useState<HTMLElement[]>([])
+  const [currentMatchIndex, setCurrentMatchIndex] = useState(0)
+  const searchInputRef = useRef<HTMLInputElement>(null)
+
   // Sort comments for navigation
   const sortedComments = fileComment?.lineComments
     ? [...fileComment.lineComments].sort((a, b) => a.startLine - b.startLine)
@@ -511,6 +518,198 @@ export function DiffViewer({
     }
   }, [lineSelection, isSelecting, viewMode])
 
+  // Clear search highlights helper
+  const clearSearchHighlights = useCallback(() => {
+    if (!diffContainerRef.current) return
+    const highlights = diffContainerRef.current.querySelectorAll('.search-match')
+    highlights.forEach(el => {
+      const parent = el.parentNode
+      if (parent) {
+        const text = document.createTextNode(el.textContent || '')
+        parent.replaceChild(text, el)
+        parent.normalize()
+      }
+    })
+    setMatches([])
+    setCurrentMatchIndex(0)
+  }, [])
+
+  // Perform search in diff content
+  const performSearch = useCallback((query: string) => {
+    if (!diffContainerRef.current || !query) {
+      clearSearchHighlights()
+      return
+    }
+
+    // Clear previous highlights first
+    clearSearchHighlights()
+
+    const container = diffContainerRef.current
+    const foundMatches: HTMLElement[] = []
+    const lowerQuery = query.toLowerCase()
+
+    // Use TreeWalker to find text nodes
+    const walker = document.createTreeWalker(
+      container,
+      NodeFilter.SHOW_TEXT,
+      {
+        acceptNode: (node) => {
+          // Skip search bar text
+          if (node.parentElement?.closest('.search-bar')) {
+            return NodeFilter.FILTER_REJECT
+          }
+          return NodeFilter.FILTER_ACCEPT
+        }
+      }
+    )
+
+    const textNodes: Text[] = []
+    let node: Node | null
+    while ((node = walker.nextNode())) {
+      textNodes.push(node as Text)
+    }
+
+    // Process each text node
+    for (const textNode of textNodes) {
+      const text = textNode.textContent || ''
+      const lowerText = text.toLowerCase()
+      let index = lowerText.indexOf(lowerQuery)
+
+      if (index === -1) continue
+
+      // Split text node and wrap matches
+      const parent = textNode.parentNode
+      if (!parent) continue
+
+      const fragment = document.createDocumentFragment()
+      let lastIndex = 0
+
+      while (index !== -1) {
+        // Add text before match
+        if (index > lastIndex) {
+          fragment.appendChild(document.createTextNode(text.slice(lastIndex, index)))
+        }
+
+        // Create highlight element
+        const mark = document.createElement('mark')
+        mark.className = 'search-match'
+        mark.textContent = text.slice(index, index + query.length)
+        fragment.appendChild(mark)
+        foundMatches.push(mark)
+
+        lastIndex = index + query.length
+        index = lowerText.indexOf(lowerQuery, lastIndex)
+      }
+
+      // Add remaining text
+      if (lastIndex < text.length) {
+        fragment.appendChild(document.createTextNode(text.slice(lastIndex)))
+      }
+
+      parent.replaceChild(fragment, textNode)
+    }
+
+    setMatches(foundMatches)
+    setCurrentMatchIndex(foundMatches.length > 0 ? 0 : -1)
+
+    // Highlight first match
+    if (foundMatches.length > 0) {
+      foundMatches[0].classList.add('search-current')
+      foundMatches[0].scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+  }, [clearSearchHighlights])
+
+  // Navigate to next match
+  const navigateNext = useCallback(() => {
+    if (matches.length === 0) return
+
+    // Remove current highlight
+    matches[currentMatchIndex]?.classList.remove('search-current')
+
+    // Move to next
+    const nextIndex = (currentMatchIndex + 1) % matches.length
+    setCurrentMatchIndex(nextIndex)
+
+    // Add highlight and scroll
+    matches[nextIndex]?.classList.add('search-current')
+    matches[nextIndex]?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }, [matches, currentMatchIndex])
+
+  // Navigate to previous match
+  const navigatePrev = useCallback(() => {
+    if (matches.length === 0) return
+
+    // Remove current highlight
+    matches[currentMatchIndex]?.classList.remove('search-current')
+
+    // Move to previous
+    const prevIndex = (currentMatchIndex - 1 + matches.length) % matches.length
+    setCurrentMatchIndex(prevIndex)
+
+    // Add highlight and scroll
+    matches[prevIndex]?.classList.add('search-current')
+    matches[prevIndex]?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }, [matches, currentMatchIndex])
+
+  // Close search
+  const closeSearch = useCallback(() => {
+    setSearchVisible(false)
+    setSearchQuery('')
+    clearSearchHighlights()
+  }, [clearSearchHighlights])
+
+  // Keyboard shortcut handler
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Cmd/Ctrl+F to open search
+      if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
+        e.preventDefault()
+        setSearchVisible(true)
+        // Focus will be set after render
+        setTimeout(() => searchInputRef.current?.focus(), 0)
+        return
+      }
+
+      // Only handle other shortcuts if search is visible
+      if (!searchVisible) return
+
+      // Escape to close
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        closeSearch()
+        return
+      }
+
+      // Enter or F3 for next match
+      if (e.key === 'Enter' || e.key === 'F3') {
+        e.preventDefault()
+        if (e.shiftKey) {
+          navigatePrev()
+        } else {
+          navigateNext()
+        }
+        return
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [searchVisible, closeSearch, navigateNext, navigatePrev])
+
+  // Perform search when query changes
+  useEffect(() => {
+    if (searchVisible && searchQuery) {
+      performSearch(searchQuery)
+    } else if (!searchQuery) {
+      clearSearchHighlights()
+    }
+  }, [searchQuery, searchVisible, performSearch, clearSearchHighlights])
+
+  // Clear search when file changes
+  useEffect(() => {
+    closeSearch()
+  }, [file, closeSearch])
+
   // Inject inline comment rows after diff renders
   useLayoutEffect(() => {
     if (!diffContainerRef.current || !fileComment?.lineComments.length) {
@@ -670,6 +869,72 @@ export function DiffViewer({
               rows={3}
             />
           )}
+        </div>
+      )}
+
+      {/* Search bar */}
+      {searchVisible && (
+        <div className="search-bar">
+          <svg className="search-icon" width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M11.5 7a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0zm-.82 4.74a6 6 0 111.06-1.06l3.04 3.04a.75.75 0 11-1.06 1.06l-3.04-3.04z" />
+          </svg>
+          <input
+            ref={searchInputRef}
+            type="text"
+            className="search-input"
+            placeholder="Search in diff..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                if (e.shiftKey) {
+                  navigatePrev()
+                } else {
+                  navigateNext()
+                }
+              }
+            }}
+          />
+          {matches.length > 0 && (
+            <span className="search-counter">
+              {currentMatchIndex + 1} of {matches.length}
+            </span>
+          )}
+          {searchQuery && matches.length === 0 && (
+            <span className="search-counter no-results">No results</span>
+          )}
+          <div className="search-nav-buttons">
+            <button
+              className="search-nav-btn"
+              onClick={navigatePrev}
+              disabled={matches.length === 0}
+              title="Previous match (Shift+Enter)"
+            >
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+                <path d="M3.22 9.78a.75.75 0 010-1.06l4.25-4.25a.75.75 0 011.06 0l4.25 4.25a.75.75 0 01-1.06 1.06L8 6.06 4.28 9.78a.75.75 0 01-1.06 0z" />
+              </svg>
+            </button>
+            <button
+              className="search-nav-btn"
+              onClick={navigateNext}
+              disabled={matches.length === 0}
+              title="Next match (Enter)"
+            >
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+                <path d="M12.78 6.22a.75.75 0 010 1.06l-4.25 4.25a.75.75 0 01-1.06 0L3.22 7.28a.75.75 0 011.06-1.06L8 9.94l3.72-3.72a.75.75 0 011.06 0z" />
+              </svg>
+            </button>
+          </div>
+          <button
+            className="search-close-btn"
+            onClick={closeSearch}
+            title="Close (Escape)"
+          >
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+              <path d="M3.72 3.72a.75.75 0 011.06 0L8 6.94l3.22-3.22a.75.75 0 111.06 1.06L9.06 8l3.22 3.22a.75.75 0 11-1.06 1.06L8 9.06l-3.22 3.22a.75.75 0 01-1.06-1.06L6.94 8 3.72 4.78a.75.75 0 010-1.06z" />
+            </svg>
+          </button>
         </div>
       )}
 

@@ -211,12 +211,28 @@ export function App() {
     }
   }, [selectedFile, setFileComment])
 
-  // Approval handler
-  const handleToggleApproval = useCallback(() => {
+  // Approval handler - also stages the file when approving
+  const handleToggleApproval = useCallback(async () => {
     if (selectedFile && fileChange) {
+      const currentlyApproved = isApproved(selectedFile.path, selectedFile.staged)
+
+      // If approving (not currently approved), stage the file
+      if (!currentlyApproved) {
+        try {
+          await invoke('stage_file', { filePath: selectedFile.path })
+          showNotification(`Staged: ${selectedFile.path}`, 'success')
+          // Refresh to show the file in staged section
+          refreshFiles()
+        } catch (err) {
+          const message = err instanceof Error ? err.message : 'Failed to stage file'
+          showNotification(message, 'error')
+          return // Don't toggle approval if staging failed
+        }
+      }
+
       toggleApproval(selectedFile.path, selectedFile.staged, fileChange.oldContent, fileChange.newContent)
     }
-  }, [selectedFile, fileChange, toggleApproval])
+  }, [selectedFile, fileChange, toggleApproval, isApproved, showNotification, refreshFiles])
 
   // Context modal
   const handleExportContext = useCallback(() => {
