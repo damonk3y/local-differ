@@ -1,6 +1,6 @@
 # Local Differ
 
-A desktop application for viewing and commenting on local Git changes. Built with Tauri 2 and React.
+A local code review tool that helps software engineers review and refine their work before committing. Add inline comments, track approvals, and export context for AI-assisted review—all without leaving your local environment. Built with Tauri 2 and React.
 
 ## Features
 

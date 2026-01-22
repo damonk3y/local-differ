@@ -18,7 +18,7 @@ yarn tauri:build      # Create production desktop application
 
 ## Architecture Overview
 
-Local Differ is a Tauri-based desktop application for viewing and commenting on local Git changes. It provides syntax-highlighted diffs, inline comments, file approval tracking, and markdown context export for code review.
+Local Differ is a local code review tool that helps software engineers review and refine their work before committing. It provides syntax-highlighted diffs, inline comments, file approval tracking, and markdown context export—enabling a self-review workflow that improves code quality before it reaches teammates or CI.
 
 ### Tech Stack
 
