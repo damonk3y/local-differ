@@ -10,6 +10,23 @@ A local code review tool that helps software engineers review and refine their w
 - **Markdown export** - Generate context for code review with diffs and comments
 - **Staged/unstaged separation** - Review staged and unstaged changes independently
 
+## Screenshots
+
+### Diff View
+View your changes with syntax highlighting in split or unified mode.
+
+![Diff View](screenshots/diff-view.png)
+
+### Inline Comments
+Add comments directly on specific lines of code.
+
+![Add Comment](screenshots/add-comment.png)
+
+### Export Context
+Generate markdown context with diffs and comments for AI-assisted code review.
+
+![Export Context](screenshots/export-context.png)
+
 ## Tech Stack
 
 - **Frontend:** React 18 + TypeScript + Vite
