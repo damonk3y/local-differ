@@ -728,7 +728,9 @@ export function DiffViewer({
     existingRows.forEach(row => row.remove())
 
     // Get colspan based on view mode
-    const colspan = viewMode === 'split' ? 5 : 3
+    // Split view: 3 columns per side (gutter + marker + content) = 6 total
+    // Unified view: 4 columns (old gutter + new gutter + marker + content)
+    const colspan = viewMode === 'split' ? 6 : 4
 
     // Inject a row after each commented line
     for (const comment of fileComment.lineComments) {
@@ -1017,7 +1019,6 @@ export function DiffViewer({
           <InlineCommentRow
             key={comment.id}
             comment={comment}
-            colspan={viewMode === 'split' ? 5 : 3}
             isFocused={focusedComment?.id === comment.id}
             onEdit={handleInlineCommentEdit}
             onDelete={handleInlineCommentDelete}

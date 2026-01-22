@@ -310,23 +310,19 @@
 }
 
 /* Inline comment row (injected into diff table) */
-.inline-comment-row {
+.inline-comment-row-container {
   background: var(--bg-secondary);
   animation: slideDown var(--transition-normal, 0.25s) ease-out;
 }
 
-.inline-comment-row td {
+.inline-comment-row-container td {
   padding: 0 !important;
   border-top: 1px solid var(--comment-border, #58a6ff) !important;
   border-bottom: 1px solid var(--border-color) !important;
 }
 
-.inline-comment-row:hover {
+.inline-comment-row-container:hover {
   background: var(--bg-secondary) !important;
-}
-
-.inline-comment-row.focused {
-  background: var(--comment-hover, rgba(88, 166, 255, 0.15)) !important;
 }
 
 @keyframes slideDown {

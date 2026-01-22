@@ -194,10 +194,10 @@
 }
 
 /* Focused state */
-.inline-comment-row.focused .inline-comment-cell {
+.inline-comment-cell.focused {
   background: var(--comment-hover, rgba(88, 166, 255, 0.15));
 }
 
-.inline-comment-row.focused .comment-actions {
+.inline-comment-cell.focused .comment-actions {
   opacity: 1;
 }
