@@ -9,11 +9,12 @@ Review local git changes for security, performance, bugs, best practices, and st
 
 ## Workflow
 
-1. Run `git diff` (unstaged) and `git diff --cached` (staged) to get changes
-2. Analyze each changed file for issues
-3. Build a JSON structure with findings
-4. Write to `.claude/review.json` using the `write_review.py` script
-5. Display a summary to the user
+1. Reset `.claude/review.json` by writing an empty review: `{"comments":[]}`
+2. Run `git diff` (unstaged) and `git diff --cached` (staged) to get changes
+3. Analyze each changed file for issues
+4. Build a JSON structure with findings (issues only - no positive comments)
+5. Write to `.claude/review.json` using the `write_review.py` script
+6. Display a summary to the user
 
 ## Review Categories
 
@@ -43,7 +44,6 @@ Build this structure and pass it to `write_review.py`:
     {
       "filePath": "src/example.ts",
       "staged": false,
-      "generalComment": "File-level summary (optional)",
       "lineComments": [
         {
           "startLine": 10,
@@ -91,13 +91,22 @@ After writing the JSON, display a summary:
 - path/file.ts:15 - Brief description
 
 Review saved to `.claude/review.json`
-Open Local Differ and click "Import Review" to see inline comments.
+```
+
+If no issues found, simply output:
+
+```
+## Code Review Complete
+
+**Files reviewed:** N
+**No issues found.**
 ```
 
 ## Review Guidelines
 
+- Only report issues - no positive comments or praise
 - Focus on changed lines but consider surrounding context
 - Prioritize actionable feedback over nitpicks
 - Explain WHY something is problematic, not just what
 - Provide concrete fix suggestions for critical issues
-- If changes look good, say so briefly and skip the JSON output
+- If no issues found, output empty review and state "No issues found"

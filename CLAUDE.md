@@ -18,7 +18,7 @@ yarn tauri:build      # Create production desktop application
 
 ## Architecture Overview
 
-Local Differ is a local code review tool that helps software engineers review and refine their work before committing. It provides syntax-highlighted diffs, inline comments, file approval tracking, and markdown context export—enabling a self-review workflow that improves code quality before it reaches teammates or CI.
+Local Differ is a local code fixing tool that helps software engineers review and refine their work before committing. It provides syntax-highlighted diffs, inline comments, file approval tracking, and markdown context export—enabling a self-review workflow that improves code quality before it reaches teammates or CI.
 
 ### Tech Stack
 
@@ -62,7 +62,7 @@ No external state library. Uses React hooks + localStorage:
 
 ### Context Export
 
-The context generator (`contextGenerator.ts`) creates markdown for code review:
+The context generator (`contextGenerator.ts`) creates markdown for AI-assisted code fixing:
 - Detects "major rewrites" (>60% changes or >3x size change)
 - Shows structural changes (added/removed functions/classes) for large rewrites
 - Shows hunked diffs with line numbers for normal changes
