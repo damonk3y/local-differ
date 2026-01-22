@@ -1,6 +1,6 @@
 # Local Differ
 
-A local code review tool that helps software engineers review and refine their work before committing. Add inline comments, track approvals, and export context for AI-assisted review—all without leaving your local environment. Built with Tauri 2 and React.
+A local code review tool that helps software engineers review and refine their work before committing. Add inline comments, track approvals, and export context for AI-assisted fixes—all without leaving your local environment. Built with Tauri 2 and React.
 
 ## Features
 
@@ -61,7 +61,7 @@ The built application will be in `src-tauri/target/release`.
 3. View staged and unstaged changes
 4. Add inline comments by clicking on diff lines
 5. Mark files as approved when reviewed
-6. Export markdown context for sharing or AI-assisted review
+6. Export markdown context for sharing or AI-assisted fixes
 
 ## License
 
